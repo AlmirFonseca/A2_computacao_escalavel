@@ -4,7 +4,7 @@ import csv
 class CadeAnalytics:
     def __init__(self, config):
         self.config = config
-        self.cade_analytics_header = ["timestamp", "type", "content", "extra_1", "extra_2"]
+        self.cade_analytics_header = ["timestamp", "store_id", "type", "content", "extra_1", "extra_2"]
 
 
     

@@ -182,7 +182,7 @@ class Simulation:
     def __user_flow(self, user):
         # let the user perform actions on the system until it reaches the EXIT node
         current_node = LOGIN
-        message = f";Audit;{user};{LOGIN}\n"
+        message = f";{self.params.store_id};Audit;{user};{LOGIN}\n"
         self.__add_message_to_log(message)
 
         current_product_list = []
@@ -230,19 +230,19 @@ class Simulation:
         self.user_flow_report.append(cur_time + message)
 
     def __home(self, user):
-        msg = f";User;{user};{STIMUL_SCROLLING};{HOME}.\n"
+        msg = f";{self.params.store_id};User;{user};{STIMUL_SCROLLING};{HOME}.\n"
         self.__add_message_to_user_flow_report(msg)
 
     def __view_product(self, user, product):
-        msg = f";User;{user};{STIMUL_ZOOM};{VIEW_PRODUCT} {product}.\n"
+        msg = f";{self.params.store_id};User;{user};{STIMUL_ZOOM};{VIEW_PRODUCT} {product}.\n"
         self.__add_message_to_user_flow_report(msg)
 
     def __cart(self, user, product):
-        msg = f";User;{user};{STIMUL_CLICK};{CART} with {product}.\n"
+        msg = f";{self.params.store_id};User;{user};{STIMUL_CLICK};{CART} with {product}.\n"
         self.__add_message_to_user_flow_report(msg)
 
     def __checkout(self, user, product_list):
-        msg = f";User;{user};{STIMUL_CLICK};{CHECKOUT} with {product_list}.\n"
+        msg = f";{self.params.store_id};User;{user};{STIMUL_CLICK};{CHECKOUT} with {product_list}.\n"
         self.__add_message_to_user_flow_report(msg)
 
         
@@ -254,17 +254,17 @@ class Simulation:
                 purchase_order = self.__generate_purchase_order(user, product, quantity)
                 
                 for _ in range(quantity):
-                    mesage = f";Audit;{user};BUY;{purchase_order.product_id}\n"
+                    mesage = f";{self.params.store_id};Audit;{user};BUY;{purchase_order.product_id}\n"
                     self.__add_message_to_log(mesage)
 
                 self.__decrease_stock(product, quantity)
         add_purchase_order()
             
     def __exit(self, user):
-        msg = f";User;{user};{STIMUL_CLICK};{EXIT}\n"
+        msg = f";{self.params.store_id};User;{user};{STIMUL_CLICK};{EXIT}\n"
         self.__add_message_to_user_flow_report(msg)
 
-        msg = f";Audit;{user};{EXIT}\n"
+        msg = f";{self.params.store_id};Audit;{user};{EXIT}\n"
         self.__add_message_to_log(msg)
 
 
@@ -325,7 +325,7 @@ class Simulation:
         self.ContaVerde.add_new_products(self.new_products)
         self.new_products = []
 
-        self.ContaVerde.rewrite_full_stock_to_csv(self.new_stock_decreases, self.stock)
+        self.ContaVerde.rewrite_full_stock_to_csv(self.new_stock_decreases, self.stock, self.params.store_id)
         self.new_stock_decreases = {}
 
         self.ContaVerde.add_new_purchase_orders_to_csv(self.new_purchase_orders)

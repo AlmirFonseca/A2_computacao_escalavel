@@ -4,7 +4,7 @@ import csv
 class DataCat:
     def __init__(self, config):
         self.config = config
-        self.datacat_header = ["timestamp", "type", "content", "extra_1", "extra_2"]
+        self.datacat_header = ["timestamp", "store_id", "type", "content", "extra_1", "extra_2"]
 
         
     def write_log(self, log_cycle, log_flow):

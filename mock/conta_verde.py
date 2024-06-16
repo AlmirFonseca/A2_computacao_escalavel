@@ -10,19 +10,26 @@ class ContaVerde:
                                     self.base_data_path + "/" + config['products_filename'],
                                     self.base_data_path + "/" + config['stock_filename'],
                                     self.base_data_path + "/" + config['purchase_orders_filename']]
-        self.user_header = ["id", "name", "email", "address", "registration_date", "birth_date"]
+        self.user_header = ["id", "name", "email", "address", "registration_date", "birth_date", "store_id"]
         self.__add_user_header()
-        self.product_header = ["id", "name", "image", "description", "price"]
+        self.product_header = ["id", "name", "image", "description", "price", "store_id"]
         self.__add_product_header()
-        self.stock_header = ["id_product", "quantity"]
+        self.stock_header = ["id_product", "quantity", "store_id"]
         self.__add_stock_header()
-        self.purchase_order_header = ["user_id", "product_id", "quantity", "creation_date", "payment_date", "delivery_date"]
+        self.purchase_order_header = ["user_id", "product_id", "quantity", "creation_date", "payment_date", "delivery_date", "store_id"]
         self.__add_purchase_order_header()
         
 
     def add_new_purchase_orders_to_csv(self, new_purchase_orders):
         if new_purchase_orders:
-            content = [[purchase_order.user_id, purchase_order.product_id, purchase_order.quantity, purchase_order.creation_date, purchase_order.payment_date, purchase_order.delivery_date] for purchase_order in new_purchase_orders]
+            content = [[purchase_order.user_id, 
+                        purchase_order.product_id, 
+                        purchase_order.quantity, 
+                        purchase_order.creation_date, 
+                        purchase_order.payment_date, 
+                        purchase_order.delivery_date,
+                        purchase_order.store_id
+                        ] for purchase_order in new_purchase_orders]
             with open(self.csv_complete_path[3], 'a') as file:
                 # acquire lock and write to the file, then release the lock
                 writer = csv.writer(file, delimiter=';', lineterminator='\n')
@@ -48,9 +55,12 @@ class ContaVerde:
             writer.writerow(self.stock_header)
     
 
-    def rewrite_full_stock_to_csv(self, new_stock_decreases, stock):
+    def rewrite_full_stock_to_csv(self, new_stock_decreases, stock, store_id):
         if new_stock_decreases:
-            content = [[product_id, quantity] for product_id, quantity in stock.items()]
+            content = [[product_id, 
+                        quantity,
+                        store_id
+                        ] for product_id, quantity in stock.items()]
             # add the first line to the content beggining
             content.insert(0, self.stock_header)
             with open(self.csv_complete_path[2], 'w', newline='') as file:
@@ -61,7 +71,13 @@ class ContaVerde:
 
     def add_new_users_to_csv(self, new_users):
         if new_users:
-            content = [[user.id, user.name, user.email, user.address, user.registration_date, user.birth_date] for user in new_users]
+            content = [[user.id, 
+                        user.name,
+                        user.email, 
+                        user.address, 
+                        user.registration_date, 
+                        user.birth_date,
+                        user.store_id] for user in new_users]
             with open(self.csv_complete_path[0], 'a') as file:
                 writer = csv.writer(file, delimiter=';', lineterminator='\n')
                 # acquire lock and write to the file, then release the lock
@@ -76,7 +92,12 @@ class ContaVerde:
 
     def add_new_products(self, new_products):
         if new_products:
-            content = [[product.id, product.name, product.image, product.description, product.price] for product in new_products]
+            content = [[product.id, 
+                        product.name, 
+                        product.image, 
+                        product.description, 
+                        product.price, 
+                        product.store_id] for product in new_products]
             with open(self.csv_complete_path[1], 'a') as file:
                 writer = csv.writer(file, delimiter=';', lineterminator='\n')
                 # acquire lock and write to the file, then release the lock
