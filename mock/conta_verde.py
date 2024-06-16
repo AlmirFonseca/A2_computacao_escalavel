@@ -5,7 +5,11 @@ class ContaVerde:
 
     def __init__(self, config):
         self.config = config
-        self.csv_complete_path = [f"{config['data_path']}/users.csv", f"{config['data_path']}/products.csv", f"{config['data_path']}/stock.csv", f"{config['data_path']}/purchase_orders.csv"]
+        self.base_data_path = config['data_path']
+        self.csv_complete_path = [self.base_data_path + "/" + config['users_filename'], 
+                                    self.base_data_path + "/" + config['products_filename'],
+                                    self.base_data_path + "/" + config['stock_filename'],
+                                    self.base_data_path + "/" + config['purchase_orders_filename']]
         self.user_header = ["id", "name", "email", "address", "registration_date", "birth_date"]
         self.__add_user_header()
         self.product_header = ["id", "name", "image", "description", "price"]

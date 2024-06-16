@@ -46,33 +46,11 @@ class Simulation:
 
         self.G = G
 
-        config_conta_verde = {
-            "data_path": "mock_files/csv",
-            "users_filename": "users.csv",
-            "products_filename": "products.csv",
-            "stock_filename": "stock.csv",
-            "purchase_orders_filename": "purchase_orders.csv",
-        }
-
-        config_datacat = {
-            "data_path": "mock_files/log",
-            "log_filename": "log_simulation.txt",
-        }
-
-        config_cade_analytics = {
-            "data_path": "mock_files/request",
-            "request_filename": "request",
-        }
-
         self.folder_name = "mock_files"
         self.subfolder_csv = "csv"
         self.subfolder_log = "log"
         self.subfolder_http_request = "request"
 
-        
-        self.ContaVerde = conta_verde.ContaVerde(config_conta_verde)
-        self.DataCat = datacat.DataCat(config_datacat)
-        self.CadeAnalytics = cade_analytics.CadeAnalytics(config_cade_analytics)
 
         # if the folder exists, delete its contents
         self.create_mock_files_folder()
@@ -80,6 +58,31 @@ class Simulation:
         # create inside folder_name or delete other folder if they exist for the other subfolders
         self.create_subfolders_mock_files()
 
+
+        config_conta_verde = {
+            "data_path": self.folder_name+"/"+self.subfolder_csv,
+            "users_filename": "users.csv",
+            "products_filename": "products.csv",
+            "stock_filename": "stock.csv",
+            "purchase_orders_filename": "purchase_orders.csv",
+        }
+
+        config_datacat = {
+            "data_path": self.folder_name+"/"+self.subfolder_log,
+            "log_filename": "log_simulation.txt",
+        }
+
+        config_cade_analytics = {
+            "data_path": self.folder_name+"/"+self.subfolder_http_request,
+            "request_filename": "request",
+        }
+
+        
+        self.ContaVerde = conta_verde.ContaVerde(config_conta_verde)
+        self.DataCat = datacat.DataCat(config_datacat)
+        self.CadeAnalytics = cade_analytics.CadeAnalytics(config_cade_analytics)
+
+  
         # generate users at the start of the simulation
         for _ in range(self.params.num_initial_users):
             self.__generate_user()
@@ -233,7 +236,6 @@ class Simulation:
     def __view_product(self, user, product):
         msg = f";User;{user};{STIMUL_ZOOM};{VIEW_PRODUCT} {product}.\n"
         self.__add_message_to_user_flow_report(msg)
-
 
     def __cart(self, user, product):
         msg = f";User;{user};{STIMUL_CLICK};{CART} with {product}.\n"
