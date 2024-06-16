@@ -1,4 +1,6 @@
 import csv
+import random
+from datetime import datetime, timedelta
 
 # DataCat class is a class that is responsible for managing the data of the application.
 class ContaVerde:
@@ -18,6 +20,7 @@ class ContaVerde:
         self.__add_stock_header()
         self.purchase_order_header = ["user_id", "product_id", "quantity", "creation_date", "payment_date", "delivery_date", "store_id"]
         self.__add_purchase_order_header()
+        self.__generate_inserts()
         
 
     def add_new_purchase_orders_to_csv(self, new_purchase_orders):
@@ -109,4 +112,79 @@ class ContaVerde:
         with open(self.csv_complete_path[1], 'w') as file:
             writer = csv.writer(file, delimiter=';', lineterminator='\n')
             writer.writerow(self.product_header)
+
+    def __generate_inserts(self):
+        self.__generate_users_inserts()
+        self.__generate_products_inserts()
+        self.__generate_stock_inserts()
+        self.__generate_purchase_orders_inserts()
+        
+    def __generate_users_inserts(self, num):
+        users = []
+        for i in range(num):
+            user = {
+                'name': f'User {i+1}',
+                'email': f'user{i+1}@example.com',
+                'address': f'{i+1} Main St',
+                'registration_date': (datetime.now() - timedelta(days=random.randint(0, 365))).date(),
+                'birth_date': (datetime.now() - timedelta(days=random.randint(6570, 18250))).date(),  # between 18 and 50 years old
+                'store_id': 1
+            }
+            users.append(user)
+
+        with open(self.csv_complete_path[0], 'a') as file:
+            writer = csv.writer(file, delimiter=';', lineterminator='\n')
+            for user in users:
+                writer.writerow([None, user['name'], user['email'], user['address'], user['registration_date'], user['birth_date'], user['store_id']])
+
+    def __generate_products_inserts(self, num):
+        products = []
+        for i in range(num):
+            product = {
+                'name': f'Product {i+1}',
+                'image': f'image_{i+1}.jpg',
+                'description': f'Description for Product {i+1}',
+                'price': round(random.uniform(5.0, 100.0), 2),
+                'store_id': 1
+            }
+            products.append(product)
+
+        with open(self.csv_complete_path[1], 'a') as file:
+            writer = csv.writer(file, delimiter=';', lineterminator='\n')
+            for product in products:
+                writer.writerow([None, product['name'], product['image'], product['description'], product['price'], product['store_id']])
+
+    def __generate_stock_inserts(self, num):
+        stock = []
+        for i in range(num):
+            stock_item = {
+                'product_id': i + 1,
+                'quantity': random.randint(1, 50),
+                'store_id': 1
+            }
+            stock.append(stock_item)
+
+        with open(self.csv_complete_path[2], 'a') as file:
+            writer = csv.writer(file, delimiter=';', lineterminator='\n')
+            for item in stock:
+                writer.writerow([item['product_id'], item['quantity'], item['store_id']])
+
+    def __generate_purchase_orders_inserts(self, num):
+        orders = []
+        for i in range(num):
+            order = {
+                'user_id': random.randint(1, num),
+                'product_id': random.randint(1, num),
+                'quantity': random.randint(1, 5),
+                'creation_date': (datetime.now() - timedelta(days=random.randint(0, 30))).strftime('%Y-%m-%d %H:%M:%S'),
+                'payment_date': (datetime.now() - timedelta(days=random.randint(0, 29))).strftime('%Y-%m-%d %H:%M:%S'),
+                'delivery_date': (datetime.now() - timedelta(days=random.randint(0, 28))).strftime('%Y-%m-%d %H:%M:%S'),
+                'store_id': 1
+            }
+            orders.append(order)
+
+        with open(self.csv_complete_path[3], 'a') as file:
+            writer = csv.writer(file, delimiter=';', lineterminator='\n')
+            for order in orders:
+                writer.writerow([order['user_id'], order['product_id'], order['quantity'], order['creation_date'], order['payment_date'], order['delivery_date'], order['store_id']])
 
