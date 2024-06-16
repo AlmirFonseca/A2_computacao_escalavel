@@ -19,7 +19,7 @@ class SimulationParams:
     max_simultaneus_users: int
     num_new_users_per_cycle: int
     num_new_products_per_cycle: int
-    store_number: int
+    store_id: int
 
 class Simulation:
     params: SimulationParams
@@ -269,16 +269,16 @@ class Simulation:
 
 
     def __generate_user(self):
-        user = models.generate_user()
+        user = models.generate_user(self.params.store_id)
         self.users.append(user.id)
         self.new_users.append(user)
 
     def __generate_stock(self, product_id, quantity):
-        stock_product = models.generate_stock(product_id, quantity)
+        stock_product = models.generate_stock(product_id, quantity, self.params.store_id)
         self.stock[stock_product.id_product] = stock_product.quantity
 
     def __generate_product(self):
-        product = models.generate_product()
+        product = models.generate_product(self.params.store_id)
         self.products.append(product.id)
         self.new_products.append(product)        
 
@@ -294,7 +294,7 @@ class Simulation:
             self.stock[product_id] -= quantity
 
     def __generate_purchase_order(self, user_id, product_id, quantity):
-        purchase_order = models.generate_purchase_order(user_id, product_id, quantity)
+        purchase_order = models.generate_purchase_order(user_id, product_id, quantity, self.params.store_id)
         self.purchase_orders.append(purchase_order)
         self.new_purchase_orders.append(purchase_order)
         return purchase_order

@@ -14,6 +14,7 @@ class User:
     address: str
     registration_date: str
     birth_date: str
+    store_id: int
 
 @dataclass
 class Product:
@@ -22,11 +23,13 @@ class Product:
     image: str
     description: str
     price: float
+    store_id: int
 
 @dataclass
 class Stock:
     id_product: str
     quantity: int
+    store_id: int
 
 @dataclass
 class Purchase_Order:
@@ -36,6 +39,7 @@ class Purchase_Order:
     creation_date: str
     payment_date: str
     delivery_date: str
+    store_id: int
 
 # Singleton decorator
 def singleton(cls):
@@ -57,7 +61,7 @@ class FakerSingleton:
         return self._faker
 
 
-def generate_user():
+def generate_user(store_id: int):
     """Generates a User dataclass instance with unique data."""
     faker = FakerSingleton().get_faker()
     return User(
@@ -67,9 +71,10 @@ def generate_user():
         address= f"{faker.street_address()}, {faker.city()}, {faker.state()}, {faker.zipcode()}, {faker.country()}",
         registration_date = str(time.time_ns()),
         birth_date=faker.date_of_birth(minimum_age=18, maximum_age=100).isoformat(),
+        store_id=store_id
     )
 
-def generate_product():
+def generate_product(store_id: int):
     """Generates a Product dataclass instance with unique data."""
     faker = FakerSingleton().get_faker()
 
@@ -79,17 +84,19 @@ def generate_product():
         image=faker.image_url(),
         description=faker.sentence(),
         price=faker.random_int(min=1, max=1000),
+        store_id=store_id
     )
 
-def generate_stock(product_id: str, quantity: int):
+def generate_stock(product_id: str, quantity: int, store_id: int):
     """Generates a Stock dataclass instance with unique data."""
     faker = FakerSingleton().get_faker()
     return Stock(
         id_product=product_id,
         quantity=quantity,
+        store_id=store_id
     )
 
-def generate_purchase_order(user_id: str, product_id: str, quantity: int):
+def generate_purchase_order(user_id: str, product_id: str, quantity: int, store_id: int):
     """Generates a Purchase_Order dataclass instance with unique data."""
     faker = FakerSingleton().get_faker()
     return Purchase_Order(
@@ -99,6 +106,7 @@ def generate_purchase_order(user_id: str, product_id: str, quantity: int):
         creation_date=str(time.time_ns()),
         payment_date=str(time.time_ns()),
         delivery_date=str(time.time_ns()),
+        store_id=store_id
     )
 
     

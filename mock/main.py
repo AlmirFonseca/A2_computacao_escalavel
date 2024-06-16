@@ -14,7 +14,7 @@ def main(store_number: int, local: int):
         max_simultaneus_users=2000,
         num_new_users_per_cycle=100,
         num_new_products_per_cycle=100,
-        store_number=store_number,
+        store_id=store_number,
     )
 
     if local:
