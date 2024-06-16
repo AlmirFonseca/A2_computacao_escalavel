@@ -2,6 +2,7 @@ import os
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
 from pyspark.sql.types import TimestampType
+from pyspark.sql.window import Window
 
 
 # Create a spark session
@@ -34,42 +35,58 @@ def read_files(spark):
 
 
 # Process the df to get count of products bought per minute
-def products_bought_minute(df):
-    return df.groupBy(F.window('datetime', '1 minute')) \
+def products_bought_minute(df_user_buy):
+    return df_user_buy.groupBy(F.window('datetime', '1 minute')) \
         .count() \
         .orderBy('window')
 
 
 # Get the amount earned per minute
-def amount_earned_minute(df, product_df):
+def amount_earned_minute(df_user_view, product_df):
     # Join the df with the product_df to get the price of the product
-    df = df.join(product_df, df["extra_2"] == product_df["id"], "left")
+    df_user_view = df_user_view.join(product_df, df_user_view["extra_2"] == product_df["id"], "left")
 
     # Calculate the amount earned
-    return df.groupBy(F.window('datetime', '1 minute')) \
+    return df_user_view.groupBy(F.window('datetime', '1 minute')) \
         .agg(F.sum('price').alias('amount_earned')) \
         .orderBy('window')
         
 
 
 # Process the df to get the number of unique users that viewed a product per minute
-def users_view_product_minute(df, product_df):
+def users_view_product_minute(df_user_view, product_df):
     # Join the df with the product_df to get the name of the product
-    df = df.join(product_df, df["extra_2"] == product_df["id"], "left")
+    df_user_view = df_user_view.join(product_df, df_user_view["extra_2"] == product_df["id"], "left")
 
-    return df.groupBy(F.window('datetime', '1 minute'), 'name') \
+    return df_user_view.groupBy(F.window('datetime', '1 minute'), 'name') \
         .agg(F.countDistinct('content').alias('unique_users')) \
         .orderBy('window')
 
 
 # Get ranking of the most viewed products per hour
-def get_view_ranking_hour(df, product_df):
+def get_view_ranking_hour(df_user_view, product_df):
     # Join the df with the product_df to get the name of the product
-    df = df.join(product_df, df["extra_2"] == product_df["id"], "left")
+    df_user_view = df_user_view.join(product_df, df_user_view["extra_2"] == product_df["id"], "left")
 
-    return df.groupBy(F.window('datetime', '1 hour'), 'name') \
+    return df_user_view.groupBy(F.window('datetime', '1 hour'), 'name') \
         .count() \
         .orderBy('window', F.col('count').desc())
+
+
+# Get the median of number of views of a product before it was bought
+def median_views_before_buy(df_user_view, df_user_buy):
+    # Calculate number of views of a product per user
+    df_user_view = df_user_view.groupBy('content', 'extra_2') \
+        .agg(F.count('content').alias('views'))
+    
+    # For each product bought, get the number of views before it was bought for each user
+    df_user_buy = df_user_buy.join(df_user_view, ['content', 'extra_2'], 'left')
+
+    # Save the amount of buys that have the same number of views
+    return df_user_buy.groupBy('views') \
+        .count() \
+        .orderBy('count')
+
 
 
 spark = create_spark_session()
@@ -104,8 +121,15 @@ df_task3.show()
 # Export the result to a csv file
 df_task3.toPandas().to_csv('task3.csv', index=False)
 
+
 df_task4 = get_view_ranking_hour(df_user_view, product_df)
 df_task4.show()
 # Export the result to a csv file
 df_task4.toPandas().to_csv('task4.csv', index=False)
 
+
+df_task5 = median_views_before_buy(df_user_view, df_user_buy)
+df_task5.show()
+# Export the result to a csv file
+df_task5.toPandas().to_csv('task5.csv', index=False)
+# PRECISA CALCULAR A MEDIANA DESSES DADOS
