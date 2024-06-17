@@ -1,12 +1,15 @@
 import csv
 import random
 from datetime import datetime, timedelta
+import psycopg2
+from psycopg2 import sql
 
 # DataCat class is a class that is responsible for managing the data of the application.
 class ContaVerde:
 
     def __init__(self, config):
         self.config = config
+
         self.base_data_path = config['data_path']
         self.csv_complete_path = [self.base_data_path + "/" + config['users_filename'], 
                                     self.base_data_path + "/" + config['products_filename'],
@@ -20,7 +23,6 @@ class ContaVerde:
         self.__add_stock_header()
         self.purchase_order_header = ["user_id", "product_id", "quantity", "creation_date", "payment_date", "delivery_date", "store_id"]
         self.__add_purchase_order_header()
-        self.__generate_inserts()
         
 
     def add_new_purchase_orders_to_csv(self, new_purchase_orders):
@@ -88,6 +90,32 @@ class ContaVerde:
                 writer.writerows(content)
                 # self.release_lock(self.csv_complete_path[0])
 
+    def add_users_to_postgresql(self, users):
+        try:
+            conn = psycopg2.connect(
+                dbname="mydatabase",
+                user="myuser",
+                password="mypassword",
+                host='postgres'  # Using service name as host
+            )
+            cur = conn.cursor()
+
+            insert_query = sql.SQL("""
+                INSERT INTO conta_verde.users (id, name, email, address, registration_date, birth_date, store_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """)
+
+            user_data = [(user.id, user.name, user.email, user.address, user.registration_date, user.birth_date, user.store_id) for user in users]
+
+            cur.executemany(insert_query, user_data)
+
+            conn.commit()
+            cur.close()
+
+            print("Users added successfully!")
+        except Exception as e:
+            print("Error:", e)
+
     def __add_user_header(self):
         with open(self.csv_complete_path[0], 'w') as file:
             writer = csv.writer(file, delimiter=';', lineterminator='\n')
@@ -112,12 +140,6 @@ class ContaVerde:
         with open(self.csv_complete_path[1], 'w') as file:
             writer = csv.writer(file, delimiter=';', lineterminator='\n')
             writer.writerow(self.product_header)
-
-    def __generate_inserts(self):
-        self.__generate_users_inserts()
-        self.__generate_products_inserts()
-        self.__generate_stock_inserts()
-        self.__generate_purchase_orders_inserts()
         
     def __generate_users_inserts(self, num):
         users = []

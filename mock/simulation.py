@@ -116,7 +116,7 @@ class Simulation:
     
     def __report_initial_cycle(self):
         
-        self.ContaVerde.add_new_users_to_csv(self.new_users)
+        self.ContaVerde.add_users_to_postgresql(self.new_users)
         self.new_users = []
       
         self.ContaVerde.add_new_products(self.new_products)
@@ -319,7 +319,7 @@ class Simulation:
 
         self.user_flow_report = []
 
-        self.ContaVerde.add_new_users_to_csv(self.new_users)
+        self.ContaVerde.add_users_to_postgresql(self.new_users)
         self.new_users = []
 
         self.ContaVerde.add_new_products(self.new_products)

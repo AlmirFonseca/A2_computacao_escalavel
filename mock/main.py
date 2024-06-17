@@ -1,7 +1,10 @@
 from graph_user_flow import *
 import simulation
 import argparse
-
+from database_manager import DatabaseManager
+import database_secrets
+import psycopg2
+import os
 
 def main(store_number: int, local: int):
     print("Starting simulation...")
@@ -16,6 +19,8 @@ def main(store_number: int, local: int):
         num_new_products_per_cycle=100,
         store_id=store_number,
     )
+
+
 
     if local:
         sim = simulation.Simulation(params)
