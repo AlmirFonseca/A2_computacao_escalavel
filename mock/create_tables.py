@@ -1,4 +1,4 @@
-import os
+import database_secrets
 import psycopg2
 
 
@@ -6,11 +6,11 @@ def main():
     conn = None
     try:
         conn = psycopg2.connect(
-            port = 5432,
-            dbname="mydatabase",
-            user="myuser",
-            password="mypassword",
-            host='postgres'  # Using service name as host
+            port = database_secrets.POSTGREE_CREDENTIALS['port'],
+            dbname=database_secrets.POSTGREE_CREDENTIALS['dbname'],
+            user=database_secrets.POSTGREE_CREDENTIALS['user'],
+            password=database_secrets.POSTGREE_CREDENTIALS['password'],
+            host=database_secrets.POSTGREE_CREDENTIALS['host']
         )
         cur = conn.cursor()
         

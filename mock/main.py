@@ -1,10 +1,6 @@
 from graph_user_flow import *
 import simulation
 import argparse
-from database_manager import DatabaseManager
-import database_secrets
-import psycopg2
-import os
 
 def main(store_number: int, local: int):
     print("Starting simulation...")

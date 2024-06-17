@@ -2,7 +2,7 @@
 DB_NAME = 'mydatabase'
 DB_USER = 'myuser'
 DB_PASSWORD = 'mypassword'
-DB_HOST = 'localhost'
+DB_HOST = 'postgres'
 DB_PORT = '5432'
 
 POSTGREE_CREDENTIALS = {
@@ -12,11 +12,3 @@ POSTGREE_CREDENTIALS = {
     "host": DB_HOST,
     "port": DB_PORT
 }
-
-# POSTGREE_CREDENTIALS = {
-#     "dbname": "postgres",
-#     "user": "myuser",
-#     "password": "mypassword",
-#     "host": "db",
-#     "port": "5432"
-# }

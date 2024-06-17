@@ -3,6 +3,7 @@ import random
 from datetime import datetime, timedelta
 import psycopg2
 from psycopg2 import sql
+import database_secrets
 
 # DataCat class is a class that is responsible for managing the data of the application.
 class ContaVerde:
@@ -93,10 +94,11 @@ class ContaVerde:
     def add_users_to_postgresql(self, users):
         try:
             conn = psycopg2.connect(
-                dbname="mydatabase",
-                user="myuser",
-                password="mypassword",
-                host='postgres'  # Using service name as host
+                port = database_secrets.POSTGREE_CREDENTIALS['port'],
+                dbname=database_secrets.POSTGREE_CREDENTIALS['dbname'],
+                user=database_secrets.POSTGREE_CREDENTIALS['user'],
+                password=database_secrets.POSTGREE_CREDENTIALS['password'],
+                host=database_secrets.POSTGREE_CREDENTIALS['host']  # Using service name as host
             )
             cur = conn.cursor()
 
