@@ -18,10 +18,10 @@ Install other dependencies:
 
 pip install -r requirements.txt
 
-
 To run the mock:
 
 - DOCKER COMPOSE BUILD
+- docker-compose up --build
 
 To check the database state:
 

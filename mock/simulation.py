@@ -47,7 +47,6 @@ class Simulation:
         self.G = G
 
         self.folder_name = "mock_files"
-        self.subfolder_csv = "csv"
         self.subfolder_log = "log"
         self.subfolder_http_request = "request"
 
@@ -59,13 +58,7 @@ class Simulation:
         self.create_subfolders_mock_files()
 
 
-        config_conta_verde = {
-            "data_path": self.folder_name+"/"+self.subfolder_csv,
-            "users_filename": "users.csv",
-            "products_filename": "products.csv",
-            "stock_filename": "stock.csv",
-            "purchase_orders_filename": "purchase_orders.csv",
-        }
+        config_conta_verde = {}
 
         config_datacat = {
             "data_path": self.folder_name+"/"+self.subfolder_log,
@@ -98,11 +91,10 @@ class Simulation:
         self.__report_initial_cycle()
 
     def create_subfolders_mock_files(self):
-        csvs_folder = f"{self.folder_name}/{self.subfolder_csv}"
         logs_folder = f"{self.folder_name}/{self.subfolder_log}"
         http_request_folder = f"{self.folder_name}/{self.subfolder_http_request}"
 
-        for folder in [csvs_folder, logs_folder, http_request_folder]:
+        for folder in [logs_folder, http_request_folder]:
             if os.path.exists(folder):
                 self.remove_folder_contents(folder)
             else:
@@ -119,9 +111,9 @@ class Simulation:
         self.ContaVerde.add_users_to_postgresql(self.new_users)
         self.new_users = []
       
-        self.ContaVerde.add_new_products(self.new_products)
+        self.ContaVerde.add_new_products_to_postgresql(self.new_products)
 
-        self.ContaVerde.add_new_stock_to_csv(self.stock)
+        self.ContaVerde.add_new_stock_to_postgresql(self.stock, self.params.store_id)
 
     def remove_folder_contents(self, folder_path):
         for root, _, files in os.walk(folder_path):
@@ -308,13 +300,11 @@ class Simulation:
         first_half = self.user_flow_report[len(self.user_flow_report)//2:]
         self.user_flow_report = self.user_flow_report[:len(self.user_flow_report)//2]
 
-        # add to the beginning of the log_flow the first half of the user_flow_report
         self.log_flow = first_half + self.log_flow
 
         self.DataCat.write_log(self.cycle, self.log_flow)
         self.log_flow = []
 
-        # self.CadeAnalytics.write_log(request_cycle, self.user_flow_report)
         self.CadeAnalytics.write_log(self.cycle, self.user_flow_report)
 
         self.user_flow_report = []
@@ -322,11 +312,11 @@ class Simulation:
         self.ContaVerde.add_users_to_postgresql(self.new_users)
         self.new_users = []
 
-        self.ContaVerde.add_new_products(self.new_products)
+        self.ContaVerde.add_new_products_to_postgresql(self.new_products)
         self.new_products = []
 
-        self.ContaVerde.rewrite_full_stock_to_csv(self.new_stock_decreases, self.stock, self.params.store_id)
+        self.ContaVerde.update_stock_in_postgresql(self.new_stock_decreases, self.stock, self.params.store_id)
         self.new_stock_decreases = {}
 
-        self.ContaVerde.add_new_purchase_orders_to_csv(self.new_purchase_orders)
+        self.ContaVerde.add_new_purchase_orders_to_postgresql(self.new_purchase_orders)
         self.new_purchase_orders = []
