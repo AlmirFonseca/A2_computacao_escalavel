@@ -38,8 +38,6 @@ def create_spark_session_postgres():
                 .builder \
                 .appName('PostgreSQL_Spark_DF') \
                 .config("spark.jars", "postgresql-42.7.3.jar") \
-                .config("spark.executor.extraClassPath", "postgresql-42.7.3.jar") \
-                .config("spark.jars.packages", "org.postgresql:postgresql:42.7.3") \
                 .getOrCreate()
             break
         except Exception as e:
@@ -125,6 +123,8 @@ def median_views_before_buy(df_user_view, df_user_buy):
         .count() \
         .orderBy('count')
 
+# Create a spark session to read the postgres database
+spark_post = create_spark_session_postgres()
 
 # Read the log files
 log_path = './mock_files/log/'
@@ -132,11 +132,7 @@ spark_local = create_spark_session_local()
 df = read_files(spark_local, log_path)
 df.show()
 
-
 jdbc_url = f"jdbc:postgresql://{POSTGREE_CREDENTIALS['host']}:{POSTGREE_CREDENTIALS['port']}/{POSTGREE_CREDENTIALS['dbname']}"
-
-# Create a spark session to read the postgres database
-spark_post = create_spark_session_postgres()
 
 # Try to read the products table
 while True:
@@ -152,52 +148,47 @@ while True:
         break
     except Exception as e:
         print("The products table isn't available yet: ", e)
-        raise e
         time.sleep(5)
 
 print("="*5, "Processing the data", "="*5)
 
-df_user_buy = df.filter(df["type"] == "Audit").filter(df["extra_1"] == "BUY")
+df_user_buy = df.filter(df["type"] == "Audit").filter(df["extra_1"] == "BUY") # Get only the buys
 
-df_user_view = df.filter(df["type"] == "User").filter(df["extra_1"] == "ZOOM")
-df_user_view = df_user_view.withColumn('extra_2', F.regexp_replace('extra_2', 'VIEW_PRODUCT ', ''))
-# Remove the final '.' from the extra_2 column
-df_user_view = df_user_view.withColumn('extra_2', F.regexp_replace('extra_2', '\.$', ''))
+df_user_view = df.filter(df["type"] == "User").filter(df["extra_1"] == "ZOOM") # Get only the views of the products
+df_user_view = df_user_view.withColumn('extra_2', F.regexp_replace('extra_2', 'VIEW_PRODUCT ', '')) # Remove the 'VIEW_PRODUCT ' from the extra_2 column
+df_user_view = df_user_view.withColumn('extra_2', F.regexp_replace('extra_2', '\.$', '')) # Remove the final '.' from the extra_2 column
 
 
 df_task1 = products_bought_minute(df_user_buy)
+print("="*5, "Número de produtos comprados por minuto:")
 df_task1.show()
-# Export the result to a csv file not using pandas
-df_task1 = df_task1.withColumn('window', F.col('window').cast('string'))
-df_task1.write.csv('./tasks/task1.csv')
+df_task1 = df_task1.withColumn('window', F.col('window').cast('string')) # convert the window column to string
+df_task1.coalesce(1).write.option("header", "true").csv('./tasks/task1/', mode='overwrite')
+
 
 df_task2 = amount_earned_minute(df_user_buy, product_df)
+print("="*5, "Valor faturado por minuto:")
 df_task2.show()
-# Export the result to a csv file
-df_task2 = df_task2.withColumn('window', F.col('window').cast('string'))
-df_task2.write.csv('./tasks/task2.csv')
+df_task2 = df_task2.withColumn('window', F.col('window').cast('string')) # convert the window column to string
+df_task2.coalesce(1).write.option("header", "true").csv('./tasks/task2/', mode='overwrite')
 
 
 df_task3 = users_view_product_minute(df_user_view, product_df)
+print("="*5, "Número de usuários únicos visualizando cada produto por minuto:")
 df_task3.show()
-# Export the result to a csv file
-df_task3 = df_task3.withColumn('window', F.col('window').cast('string'))
-df_task3.write.csv('./tasks/task3.csv')
+df_task3 = df_task3.withColumn('window', F.col('window').cast('string')) # convert the window column to string
+df_task3.coalesce(1).write.option("header", "true").csv('./tasks/task3/', mode='overwrite')
 
 
 df_task4 = get_view_ranking_hour(df_user_view, product_df)
+print("="*5, "Ranking dos produtos mais visualizados por hora:")
 df_task4.show()
-# Export the result to a csv file
-df_task4 = df_task4.withColumn('window', F.col('window').cast('string'))
-df_task4.write.csv('./tasks/task4.csv')
+df_task4 = df_task4.withColumn('window', F.col('window').cast('string')) # convert the window column to string
+df_task4.coalesce(1).write.option("header", "true").csv('./tasks/task4/', mode='overwrite')
 
 
 df_task5 = median_views_before_buy(df_user_view, df_user_buy)
+print("="*5, "Mediana do número de vezes que um usuário visualiza um produto antes de efetuar uma compra:")
 df_task5.show()
-# Export the result to a csv file
-df_task5.write.csv('./tasks/task5.csv')
+df_task5.coalesce(1).write.option("header", "true").csv('./tasks/task5/', mode='overwrite')
 # PRECISA CALCULAR A MEDIANA DESSES DADOS
-
-# Print directory of the files
-print("Files created in the tasks folder:")
-print(os.listdir('./tasks/'))

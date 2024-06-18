@@ -1,8 +1,0 @@
-window,count
-"Row(start=Timestamp('2024-06-16 16:32:00'), end=Timestamp('2024-06-16 16:33:00'))",38
-"Row(start=Timestamp('2024-06-16 16:33:00'), end=Timestamp('2024-06-16 16:34:00'))",1236
-"Row(start=Timestamp('2024-06-16 16:34:00'), end=Timestamp('2024-06-16 16:35:00'))",1211
-"Row(start=Timestamp('2024-06-16 16:35:00'), end=Timestamp('2024-06-16 16:36:00'))",1165
-"Row(start=Timestamp('2024-06-16 16:36:00'), end=Timestamp('2024-06-16 16:37:00'))",1216
-"Row(start=Timestamp('2024-06-16 16:37:00'), end=Timestamp('2024-06-16 16:38:00'))",1127
-"Row(start=Timestamp('2024-06-16 16:38:00'), end=Timestamp('2024-06-16 16:39:00'))",120

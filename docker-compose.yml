@@ -13,6 +13,7 @@ services:
     
 
   create_tables:
+    image: create_tables:latest
     build: ./mock
     depends_on:
       - postgres
@@ -21,6 +22,7 @@ services:
     command: python create_tables.py
 
   insert_data:
+    image: insert_data:latest
     build: ./mock
     depends_on:
       - create_tables
@@ -31,6 +33,7 @@ services:
 
   
   spark-historic-app:
+    image: spark-historic-app:latest
     build: ./server
     depends_on:
       - create_tables

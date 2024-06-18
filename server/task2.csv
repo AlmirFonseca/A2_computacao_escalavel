@@ -1,8 +1,0 @@
-window,amount_earned
-"Row(start=Timestamp('2024-06-16 16:32:00'), end=Timestamp('2024-06-16 16:33:00'))",41228.0
-"Row(start=Timestamp('2024-06-16 16:33:00'), end=Timestamp('2024-06-16 16:34:00'))",1172231.0
-"Row(start=Timestamp('2024-06-16 16:34:00'), end=Timestamp('2024-06-16 16:35:00'))",1051830.0
-"Row(start=Timestamp('2024-06-16 16:35:00'), end=Timestamp('2024-06-16 16:36:00'))",897932.0
-"Row(start=Timestamp('2024-06-16 16:36:00'), end=Timestamp('2024-06-16 16:37:00'))",878069.0
-"Row(start=Timestamp('2024-06-16 16:37:00'), end=Timestamp('2024-06-16 16:38:00'))",818432.0
-"Row(start=Timestamp('2024-06-16 16:38:00'), end=Timestamp('2024-06-16 16:39:00'))",91201.0
