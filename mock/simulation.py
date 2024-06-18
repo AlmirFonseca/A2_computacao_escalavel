@@ -20,6 +20,8 @@ class SimulationParams:
     num_new_users_per_cycle: int
     num_new_products_per_cycle: int
     store_id: int
+    logs_folder: str
+    requests_folder: str
 
 class Simulation:
     params: SimulationParams
@@ -46,30 +48,35 @@ class Simulation:
 
         self.G = G
 
-        self.folder_name = "mock_files"
-        self.subfolder_log = "log"
-        self.subfolder_http_request = "request"
+        self.store_folder_name = f"store_{self.params.store_id}"
 
+        # create store folder inside requests folder and logs folder
+        self.logs_folder_name = self.params.logs_folder
+        self.requests_folder_name = self.params.requests_folder
 
-        # if the folder exists, delete its contents
-        self.create_mock_files_folder()
+        # create store folder inside requests folder and logs folder
+        self.logs_folder_store = f"{self.logs_folder_name}/{self.store_folder_name}"
+        self.requests_folder_store = f"{self.requests_folder_name}/{self.store_folder_name}"
 
-        # create inside folder_name or delete other folder if they exist for the other subfolders
-        self.create_subfolders_mock_files()
-
+        if not os.path.exists(self.logs_folder_store):
+            os.makedirs(self.logs_folder_store)
+        if not os.path.exists(self.requests_folder_store):
+            os.makedirs(self.requests_folder_store)
 
         config_conta_verde = {}
 
         config_datacat = {
-            "data_path": self.folder_name+"/"+self.subfolder_log,
+            "data_path": self.requests_folder_store,
             "log_filename": "log_simulation.txt",
         }
 
         config_cade_analytics = {
-            "data_path": self.folder_name+"/"+self.subfolder_http_request,
-            "request_filename": "request",
+            "data_path": self.logs_folder_store,
+            "request_filename": "request_simulation.txt",
+            "server_url": "http://localhost:5000"
         }
 
+          # Replace with your Flask server URL
         
         self.ContaVerde = conta_verde.ContaVerde(config_conta_verde)
         self.DataCat = datacat.DataCat(config_datacat)
@@ -89,22 +96,8 @@ class Simulation:
             self.__generate_stock(product, self.params.qtd_stock_initial)
 
         self.__report_initial_cycle()
+            
 
-    def create_subfolders_mock_files(self):
-        logs_folder = f"{self.folder_name}/{self.subfolder_log}"
-        http_request_folder = f"{self.folder_name}/{self.subfolder_http_request}"
-
-        for folder in [logs_folder, http_request_folder]:
-            if os.path.exists(folder):
-                self.remove_folder_contents(folder)
-            else:
-                os.makedirs(folder)
-
-    def create_mock_files_folder(self):
-        if os.path.exists(self.folder_name):
-            self.remove_folder_contents(self.folder_name)
-        else:
-            os.makedirs(self.folder_name)
     
     def __report_initial_cycle(self):
         
@@ -115,11 +108,6 @@ class Simulation:
 
         self.ContaVerde.add_new_stock_to_postgresql(self.stock, self.params.store_id)
 
-    def remove_folder_contents(self, folder_path):
-        for root, _, files in os.walk(folder_path):
-            for file in files:
-                file_path = os.path.join(root, file)
-                os.remove(file_path)     
     
     def run(self):
         while True:
