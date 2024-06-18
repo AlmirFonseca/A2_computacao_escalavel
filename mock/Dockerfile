@@ -9,9 +9,9 @@ ENV PYTHONUNBUFFERED 1
 WORKDIR /app
 
 # Install dependencies
-COPY requirements.txt /app/
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the app code
-COPY create_tables.py /app/
-COPY main.py /app/
+COPY create_tables.py .
+COPY main.py .
