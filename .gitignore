@@ -162,3 +162,4 @@ cython_debug/
 #.idea/
 
 mock/mock_files/*
+tasks/*
