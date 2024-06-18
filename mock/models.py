@@ -65,7 +65,7 @@ def generate_user(store_id: int):
     """Generates a User dataclass instance with unique data."""
     faker = FakerSingleton().get_faker()
     return User(
-        id=faker.unique.numerify(text="1########"),
+        id=faker.unique.numerify(text="1###########"),
         name=faker.name(),
         email=faker.email(),
         address= f"{faker.street_address()}, {faker.city()}, {faker.state()}, {faker.zipcode()}, {faker.country()}",
@@ -79,7 +79,7 @@ def generate_product(store_id: int):
     faker = FakerSingleton().get_faker()
 
     return Product(
-        id=faker.unique.numerify(text="2######"),
+        id=faker.unique.numerify(text="2#########"),
         name=faker.word(),
         image=faker.image_url(),
         description=faker.sentence(),
