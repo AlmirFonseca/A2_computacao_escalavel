@@ -3,9 +3,10 @@ import simulation
 import argparse
 import multiprocessing
 import os
+import uuid
 
-def simulate_store(store_number, logs_folder, requests_folder):
-    print(f"Starting simulation for Store {store_number}...")
+def simulate_store(store_id_unique, logs_folder, requests_folder):
+    print(f"Starting simulation for Store {store_id_unique}...")
     
     params = simulation.SimulationParams(
         cycle_duration=0.1,
@@ -15,7 +16,7 @@ def simulate_store(store_number, logs_folder, requests_folder):
         max_simultaneus_users=2000,
         num_new_users_per_cycle=100,
         num_new_products_per_cycle=100,
-        store_id=store_number,
+        store_id=store_id_unique,
         logs_folder=logs_folder,
         requests_folder=requests_folder
     )
@@ -23,7 +24,7 @@ def simulate_store(store_number, logs_folder, requests_folder):
     sim = simulation.Simulation(params)
     sim.run()
 
-    print(f"Simulation for Store {store_number} finished.")
+    print(f"Simulation for Store {store_id_unique} finished.")
 
 # create the main folder for this machine, deleting all its contents if it already exists
 def create_mock_files_folder(folder_name):
@@ -49,7 +50,10 @@ def main(num_stores: int, local: int):
         print(logs_folder)
         requests_folder = [requests_folder] * num_stores
         print(requests_folder)
-        pool.starmap(simulate_store, zip(range(1, num_stores + 1), logs_folder, requests_folder))
+        stores_id = [uuid.uuid4() for _ in range(num_stores)]
+        stores_id = [str(i) + "_" + str(store_id) for i, store_id in enumerate(stores_id)]
+
+        pool.starmap(simulate_store, zip(stores_id, logs_folder, requests_folder))
         pool.close()
         pool.join()
     else:

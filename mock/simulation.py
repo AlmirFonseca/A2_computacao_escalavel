@@ -19,7 +19,7 @@ class SimulationParams:
     max_simultaneus_users: int
     num_new_users_per_cycle: int
     num_new_products_per_cycle: int
-    store_id: int
+    store_id: str
     logs_folder: str
     requests_folder: str
 
