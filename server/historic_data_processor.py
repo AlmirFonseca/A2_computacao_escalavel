@@ -167,22 +167,6 @@ def get_df_last_minute(df, window_column, column_name, columns_list):
 
     return get_df_grouped(df, column_name, columns_list)
 
-def remove_zero_level_nesting(d):
-    """
-    Remove the specific "0" level nesting from the dictionary.
-
-    :param d: The dictionary with a specific nesting level to remove
-    :return: A dictionary with the "0" level nesting removed
-    """
-    flattened = {}
-    for outer_key, inner_dict in d.items():
-        if '0' in inner_dict:
-            # Promote the "0" level contents to the outer key
-            flattened[outer_key] = inner_dict['0']
-        else:
-            # If "0" level is not present, just copy the outer_dict key-value pairs
-            flattened[outer_key] = inner_dict
-    return flattened
 
 # Function to send the dataframe to the redis as a dictionary
 def send_to_redis_as_dict(redis_client, df, task_name, column_name = 'store_id'):
@@ -193,7 +177,6 @@ def send_to_redis_as_dict(redis_client, df, task_name, column_name = 'store_id')
             data[i] = {detail_key: detail_value for detail_key, detail_value in detail.asDict().items()}
             if i == 9:
                 break
-        # data = remove_zero_level_nesting(data)
         redis_client.hset(task_name, str(row[column_name]), json.dumps(data))
 
 
@@ -201,7 +184,7 @@ def send_to_redis_as_dict(redis_client, df, task_name, column_name = 'store_id')
 spark_post = create_spark_session_postgres()
 
 # Read the log files
-log_path = './mock_files/requests/'
+log_path = './mock_files/logs/'
 spark_local = create_spark_session_local()
 df = read_files(spark_local, log_path)
 df.show()
