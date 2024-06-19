@@ -188,8 +188,11 @@ def remove_zero_level_nesting(d):
 def send_to_redis_as_dict(redis_client, df, task_name, column_name = 'store_id'):
     for row in df.collect():
         data = {}
+        # Send 10 top products
         for i, detail in enumerate(row['details']):
             data[i] = {detail_key: detail_value for detail_key, detail_value in detail.asDict().items()}
+            if i == 9:
+                break
         # data = remove_zero_level_nesting(data)
         redis_client.hset(task_name, str(row[column_name]), json.dumps(data))
 
@@ -269,7 +272,7 @@ df_task2.show()
 print("="*5, "ENVIANDO PARA O REDIS")
 
 # Obtain the last minute of the dataframe for each store
-df_task2_last_data = get_df_last_minute(df_task2, 'window_end', 'store_id', ['value', 'window_start', 'window_end'])
+df_task2_last_data = get_df_last_minute(df_task2, 'window_end', 'store_id', ['amount_earned', 'window_start', 'window_end'])
 send_to_redis_as_dict(r, df_task2_last_data, 'revenue_per_minute')
 
 # Testing redis
@@ -287,7 +290,7 @@ print("="*5, "Número de usuários únicos visualizando cada produto por minuto:
 df_task3.show()
 
 print("="*5, "ENVIANDO PARA O REDIS")
-df_task3_last_data = get_df_last_minute(df_task3, 'end', 'store_id', ['name', 'unique_users', 'window_start', 'window_end'])
+df_task3_last_data = get_df_last_minute(df_task3, 'window_end', 'store_id', ['name', 'unique_users', 'window_start', 'window_end'])
 send_to_redis_as_dict(r, df_task3_last_data, 'unique_users_per_minute')
 
 # Testing redis
@@ -297,15 +300,15 @@ for key, value in all_data.items():
 
 
 df_task4 = get_view_ranking_hour(df_user_view, product_df)
-df_task4 = df_task4.withColumn('start', F.col('window')['start'].cast('string')) \
-    .withColumn('end', F.col('window')['end']) \
+df_task4 = df_task4.withColumn('window_start', F.col('window')['start'].cast('string')) \
+    .withColumn('window_end', F.col('window')['end']) \
     .drop('window')
 
 print("="*5, "Ranking dos produtos mais visualizados por hora:")
 df_task4.show()
 
 print("="*5, "ENVIANDO PARA O REDIS")
-df_task4_last_data = get_df_last_minute(df_task4, 'end', 'store_id', ['name', 'views', 'start', 'end'])
+df_task4_last_data = get_df_last_minute(df_task4, 'window_end', 'store_id', ['name', 'views', 'window_start', 'window_end'])
 send_to_redis_as_dict(r, df_task4_last_data, 'ranking_viewed_products_per_hour')
 
 # Testing redis
