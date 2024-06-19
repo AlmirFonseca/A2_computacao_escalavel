@@ -1,0 +1,11 @@
+services:
+  webhook:
+    image: webhook:latest
+    build: .
+    environment:
+      RABBITMQ_HOST: localhost
+    network_mode: "host"
+    restart: on-failure:always
+    volumes:
+      - ./app
+    command: python webhook.py
