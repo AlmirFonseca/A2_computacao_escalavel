@@ -183,13 +183,31 @@ def get_df_grouped(df, column_name, columns_list):
     return df_grouped
 
 
-# Function to obtain the last minute of the dataframe for each data in the column and group the column_list in a details column
-def get_df_last_minute(df, window_column, column_name, columns_list):
+# Function to obtain the last time of the dataframe for each data in the column and group the column_list in a details column
+def get_df_last_time(df, window_column, column_name, columns_list):
     windowSpec = Window.partitionBy(column_name).orderBy(F.desc(window_column))
     df = df.withColumn(window_column, F.col(window_column).cast('string'))
     df = df.withColumn('rank', F.dense_rank().over(windowSpec)).filter(F.col('rank') == 1).drop('rank')
 
-    return get_df_grouped(df, column_name, columns_list)
+    return get_df_grouped(df, column_name, columns_list), df.select(window_column).distinct().collect()[0][0]
+
+
+# Function to save and remove the old data from a dataframe
+def save_old_data(df, window_column, latest_time, file_path):
+    # If the window_column wasn't given, save all the data in a file, overwriting the old data
+    if window_column == None:
+        df.coalesce(1).write.mode('overwrite').csv(file_path)
+        return df
+
+    # Save the old data in a file
+    df_old_data = df.filter(F.col(window_column) < latest_time)
+    df_old_data.coalesce(1).write.mode('overwrite').csv(file_path)
+
+    # Remove the old data from the dataframe
+    df = df.filter(F.col(window_column) >= latest_time)
+
+    return df
+
 
 # Function to send the dataframe to the redis as a dictionary
 def send_to_redis_as_dict(redis_client, df, task_name, column_name = 'store_id'):
@@ -205,7 +223,7 @@ def send_to_redis_as_dict(redis_client, df, task_name, column_name = 'store_id')
 
 
 # Function to process all the data
-def process_data(redis_client, spark_local, spark_post, log_files, df_tasks={}):
+def process_data(redis_client, spark_local, spark_post, log_files, tasks_path, df_tasks={}):
     df, files_already_read = read_files(spark_local, log_files)
 
     jdbc_url = f"jdbc:postgresql://{POSTGREE_CREDENTIALS['host']}:{POSTGREE_CREDENTIALS['port']}/{POSTGREE_CREDENTIALS['dbname']}"
@@ -253,7 +271,7 @@ def process_data(redis_client, spark_local, spark_post, log_files, df_tasks={}):
 
     print("="*5, "ENVIANDO TAREFA 1 PARA O REDIS", "="*5)
     # Get the last minute of the dataframe for each store
-    df_task1_last_data = get_df_last_minute(df_task1, 'window_end', 'store_id', ['count', 'window_start', 'window_end'])
+    df_task1_last_data, last_time_task1 = get_df_last_time(df_task1, 'window_end', 'store_id', ['count', 'window_start', 'window_end'])
     send_to_redis_as_dict(redis_client, df_task1_last_data, 'purchases_per_minute')
 
 
@@ -274,7 +292,7 @@ def process_data(redis_client, spark_local, spark_post, log_files, df_tasks={}):
 
     print("="*5, "ENVIANDO A TAREFA 2 PARA O REDIS", "="*5)
     # Obtain the last minute of the dataframe for each store
-    df_task2_last_data = get_df_last_minute(df_task2, 'window_end', 'store_id', ['amount_earned', 'window_start', 'window_end'])
+    df_task2_last_data, last_time_task2 = get_df_last_time(df_task2, 'window_end', 'store_id', ['amount_earned', 'window_start', 'window_end'])
     send_to_redis_as_dict(redis_client, df_task2_last_data, 'revenue_per_minute')
 
 
@@ -294,7 +312,7 @@ def process_data(redis_client, spark_local, spark_post, log_files, df_tasks={}):
             .orderBy('window_end', 'store_id', F.desc('unique_users'))
 
     print("="*5, "ENVIANDO A TAREFA 3 PARA O REDIS", "="*5)
-    df_task3_last_data = get_df_last_minute(df_task3, 'window_end', 'store_id', ['name', 'unique_users', 'window_start', 'window_end'])
+    df_task3_last_data , last_time_task3 = get_df_last_time(df_task3, 'window_end', 'store_id', ['name', 'unique_users', 'window_start', 'window_end'])
     send_to_redis_as_dict(redis_client, df_task3_last_data, 'unique_users_per_minute')
 
 
@@ -314,7 +332,7 @@ def process_data(redis_client, spark_local, spark_post, log_files, df_tasks={}):
             .orderBy('window_end', 'store_id', F.desc('views'))
 
     print("="*5, "ENVIANDO A TAREFA 4 PARA O REDIS", "="*5)
-    df_task4_last_data = get_df_last_minute(df_task4, 'window_end', 'store_id', ['name', 'views', 'window_start', 'window_end'])
+    df_task4_last_data, last_time_task4 = get_df_last_time(df_task4, 'window_end', 'store_id', ['name', 'views', 'window_start', 'window_end'])
     send_to_redis_as_dict(redis_client, df_task4_last_data, 'ranking_viewed_products_per_hour')
 
 
@@ -335,14 +353,15 @@ def process_data(redis_client, spark_local, spark_post, log_files, df_tasks={}):
     df_task5_grouped = get_df_grouped(df_task5, 'store_id', ['views', 'count'])
     send_to_redis_as_dict(redis_client, df_task5_grouped, 'median_views_before_buy')
 
+    print("="*5, "Saving old data from the dataframes", "="*5)
 
-    # Save the dataframes in the df_tasks dictionary
+    # Save the dataframes in the tasks folder and return the dataframes
     df_tasks = {
-        'purchases_per_minute': df_task1,
-        'revenue_per_minute': df_task2,
-        'unique_users_per_minute': df_task3,
-        'ranking_viewed_products_per_hour': df_task4,
-        'median_views_before_buy': df_task5
+        'purchases_per_minute': save_old_data(df_task1, 'window_end', last_time_task1, tasks_path + 'purchases_per_minute'),
+        'revenue_per_minute': save_old_data(df_task2, 'window_end', last_time_task2, tasks_path + 'revenue_per_minute'),
+        'unique_users_per_minute': save_old_data(df_task3, 'window_end', last_time_task3, tasks_path + 'unique_users_per_minute'),
+        'ranking_viewed_products_per_hour': save_old_data(df_task4, 'window_end', last_time_task4, tasks_path + 'ranking_viewed_products_per_hour'),
+        'median_views_before_buy': save_old_data(df_task5, None, None, tasks_path + 'median_views_before_buy')
     }
 
     print("="*5, "Data processing finished", "="*5)
@@ -360,11 +379,15 @@ redis_client.flushall()
 
 # Define the path of the log files
 log_path = './mock_files/logs/'
+tasks_path = './tasks/'
 
+# Clear the tasks folder
+if os.path.exists(tasks_path):
+    os.system(f"rm -rf {tasks_path}")
 
 # Initial read of the files
 initial_files = get_log_files(log_path)
-files_read, df_tasks = process_data(redis_client, spark_local, spark_post, initial_files)
+files_read, df_tasks = process_data(redis_client, spark_local, spark_post, initial_files, tasks_path)
 
 
 # Incremental read of the files 
@@ -373,7 +396,7 @@ while True:
     if len(new_files) == 0:
         print("="*5, "No new files to process", "="*5)
     else:
-        new_files_read, df_tasks = process_data(redis_client, spark_local, spark_post, new_files, df_tasks)
+        new_files_read, df_tasks = process_data(redis_client, spark_local, spark_post, new_files, tasks_path, df_tasks)
         files_read.extend(new_files_read)
         files_read += new_files
     # Wait 5 seconds before checking for new files
