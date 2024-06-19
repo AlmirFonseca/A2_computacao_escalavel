@@ -37,8 +37,8 @@ services:
     command: python main.py
 
   
-  spark-historic-app:
-    image: spark-historic-app:latest
+  data-processor-app:
+    image: data_processor:latest
     build: ./server
     restart: on-failure
     depends_on:
@@ -53,8 +53,8 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     volumes:
-      - ./mock/mock_files:/historic_spark/mock_files
-    command: python historic_data_processor.py
+      - ./mock/mock_files:/processor/mock_files
+    command: python data_processor.py
 
   rabbitmq:
     image: rabbitmq:3-management
