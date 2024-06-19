@@ -231,6 +231,7 @@ send_to_redis_as_dict(r, df_task1_last_data, 'purchases_per_minute')
 
 # Testing redis
 all_data = r.hgetall('purchases_per_minute')
+print("Testing - Purchases per minute")
 for key, value in all_data.items():
     print(key, json.loads(value))
 
