@@ -1,4 +1,7 @@
 import pika
+import os
+
+rabbitmq_host = os.getenv('RABBITMQ_HOST', 'localhost')
 
 # Establish connection to RabbitMQ server
 connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
