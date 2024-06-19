@@ -93,7 +93,7 @@ def amount_earned_minute(df_user_view, product_df):
 
     # Calculate the amount earned
     return df_user_view.groupBy(F.window('datetime', '1 minute'), 'df_user_view.store_id') \
-        .agg(F.sum(F.col('price').cast('int')).alias('price')) \
+        .agg(F.sum(F.col('price').cast('int')).alias('amount_earned')) \
         .orderBy('window', 'store_id')
         
 
@@ -227,11 +227,10 @@ print("="*5, "ENVIANDO PARA O REDIS")
 
 # Get the last minute of the dataframe for each store
 df_task1_last_data = get_df_last_minute(df_task1, 'end', 'store_id', ['count', 'start', 'end'])
-send_to_redis_as_dict(r, df_task1_last_data, 'task1')
+send_to_redis_as_dict(r, df_task1_last_data, 'purchases_per_minute')
 
 # Testing redis
-print("="*5, "TESTANDO O REDIS")
-all_data = r.hgetall('task1')
+all_data = r.hgetall('purchases_per_minute')
 for key, value in all_data.items():
     print(key, json.loads(value))
 
@@ -248,32 +247,48 @@ print("="*5, "ENVIANDO PARA O REDIS")
 
 # Obtain the last minute of the dataframe for each store
 df_task2_last_data = get_df_last_minute(df_task2, 'end', 'store_id', ['amount_earned', 'start', 'end'])
-send_to_redis_as_dict(r, df_task2_last_data, 'task2')
+send_to_redis_as_dict(r, df_task2_last_data, 'revenue_per_minute')
 
 # Testing redis
-print("="*5, "TESTANDO O REDIS")
-all_data = r.hgetall('task2')
+all_data = r.hgetall('revenue_per_minute')
 for key, value in all_data.items():
     print(key, json.loads(value))
 
 
-# # Obtain the last minute of the dataframe for each store
-# windowSpec = Window.partitionBy('store_id').orderBy(F.desc('end'))
-# df_task2_last_data = df_task2.withColumn('rank', F.dense_rank().over(windowSpec)).filter(F.col('rank') == 1).drop('rank')
+df_task3 = users_view_product_minute(df_user_view, product_df)
+df_task3 = df_task3.withColumn('start', F.col('window')['start'].cast('string')) \
+    .withColumn('end', F.col('window')['end']) \
+    .drop('window')
+
+print("="*5, "Número de usuários únicos visualizando cada produto por minuto:")
+df_task3.show()
+
+print("="*5, "ENVIANDO PARA O REDIS")
+df_task3_last_data = get_df_last_minute(df_task3, 'end', 'store_id', ['name', 'unique_users', 'start', 'end'])
+send_to_redis_as_dict(r, df_task3_last_data, 'unique_users_per_minute')
+
+# Testing redis
+all_data = r.hgetall('unique_users_per_minute')
+for key, value in all_data.items():
+    print(key, json.loads(value))
 
 
-# df_task3 = users_view_product_minute(df_user_view, product_df)
-# print("="*5, "Número de usuários únicos visualizando cada produto por minuto:")
-# df_task3.show()
-# df_task3 = df_task3.withColumn('window', F.col('window').cast('string')) # convert the window column to string
-# df_task3.coalesce(1).write.option("header", "true").csv('./tasks/task3/', mode='overwrite')
+df_task4 = get_view_ranking_hour(df_user_view, product_df)
+df_task4 = df_task4.withColumn('start', F.col('window')['start'].cast('string')) \
+    .withColumn('end', F.col('window')['end']) \
+    .drop('window')
 
+print("="*5, "Ranking dos produtos mais visualizados por hora:")
+df_task4.show()
 
-# df_task4 = get_view_ranking_hour(df_user_view, product_df)
-# print("="*5, "Ranking dos produtos mais visualizados por hora:")
-# df_task4.show()
-# df_task4 = df_task4.withColumn('window', F.col('window').cast('string')) # convert the window column to string
-# df_task4.coalesce(1).write.option("header", "true").csv('./tasks/task4/', mode='overwrite')
+print("="*5, "ENVIANDO PARA O REDIS")
+df_task4_last_data = get_df_last_minute(df_task4, 'end', 'store_id', ['name', 'views', 'start', 'end'])
+send_to_redis_as_dict(r, df_task4_last_data, 'ranking_viewed_products_per_hour')
+
+# Testing redis
+all_data = r.hgetall('ranking_viewed_products_per_hour')
+for key, value in all_data.items():
+    print(key, json.loads(value))
 
 
 # df_task5 = median_views_before_buy(df_user_view, df_user_buy)
