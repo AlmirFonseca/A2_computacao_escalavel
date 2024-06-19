@@ -207,7 +207,6 @@ def send_to_redis_as_dict(redis_client, df, task_name, column_name = 'store_id')
 # Function to process all the data
 def process_data(redis_client, spark_local, spark_post, log_files, df_tasks={}):
     df, files_already_read = read_files(spark_local, log_files)
-    df.show()
 
     jdbc_url = f"jdbc:postgresql://{POSTGREE_CREDENTIALS['host']}:{POSTGREE_CREDENTIALS['port']}/{POSTGREE_CREDENTIALS['dbname']}"
 
@@ -221,7 +220,6 @@ def process_data(redis_client, spark_local, spark_post, log_files, df_tasks={}):
                 .option("password", POSTGREE_CREDENTIALS['password']) \
                 .option("driver", "org.postgresql.Driver") \
                 .load()
-            product_df.show()
             break
         except Exception as e:
             print("The products table isn't available yet: ", e)
@@ -239,7 +237,7 @@ def process_data(redis_client, spark_local, spark_post, log_files, df_tasks={}):
 
 
     # ---------- Task 1 ----------
-    print("="*5, "Número de produtos comprados por minuto:")
+    print("="*5, "Calculando o número de produtos comprados por minuto", "="*5)
     df_task1 = products_bought_minute(df_user_buy)
     df_task1 = df_task1.withColumn('window_start', F.col('window')['start'].cast('string')) \
         .withColumn('window_end', F.col('window')['end']) \
@@ -251,23 +249,16 @@ def process_data(redis_client, spark_local, spark_post, log_files, df_tasks={}):
         df_task1 = df_task1.unionByName(df_tasks['purchases_per_minute']) \
             .groupBy('window_start', 'window_end', 'store_id') \
             .agg(F.sum('count').alias('count')) \
-            .orderBy('window_end', 'store_id')
-        
-    df_task1.show()
+            .orderBy('window_end', 'store_id')        
 
-    print("="*5, "ENVIANDO PARA O REDIS")
+    print("="*5, "ENVIANDO TAREFA 1 PARA O REDIS", "="*5)
     # Get the last minute of the dataframe for each store
     df_task1_last_data = get_df_last_minute(df_task1, 'window_end', 'store_id', ['count', 'window_start', 'window_end'])
     send_to_redis_as_dict(redis_client, df_task1_last_data, 'purchases_per_minute')
 
-    # Testing redis
-    all_data = redis_client.hgetall('purchases_per_minute')
-    print("Testing - Purchases per minute")
-    for key, value in all_data.items():
-        print(key, json.loads(value))
 
     # ---------- Task 2 ----------
-    print("="*5, "Valor faturado por minuto:")
+    print("="*5, "Calculando o valor faturado por minuto", "="*5)
     df_task2 = amount_earned_minute(df_user_buy, product_df)
     df_task2 = df_task2.withColumn('window_start', F.col('window')['start'].cast('string')) \
         .withColumn('window_end', F.col('window')['end']) \
@@ -281,14 +272,14 @@ def process_data(redis_client, spark_local, spark_post, log_files, df_tasks={}):
             .agg(F.sum('amount_earned').alias('amount_earned')) \
             .orderBy('window_end', 'store_id')
 
-    print("="*5, "ENVIANDO PARA O REDIS")
+    print("="*5, "ENVIANDO A TAREFA 2 PARA O REDIS", "="*5)
     # Obtain the last minute of the dataframe for each store
     df_task2_last_data = get_df_last_minute(df_task2, 'window_end', 'store_id', ['amount_earned', 'window_start', 'window_end'])
     send_to_redis_as_dict(redis_client, df_task2_last_data, 'revenue_per_minute')
 
 
     # ---------- Task 3 ----------
-    print("="*5, "Número de usuários únicos visualizando cada produto por minuto:")
+    print("="*5, "Calculando o número de usuários únicos visualizando cada produto por minuto", "="*5)
     df_task3 = users_view_product_minute(df_user_view, product_df)
     df_task3 = df_task3.withColumn('window_start', F.col('window')['start'].cast('string')) \
         .withColumn('window_end', F.col('window')['end']) \
@@ -302,13 +293,13 @@ def process_data(redis_client, spark_local, spark_post, log_files, df_tasks={}):
             .agg(F.sum('unique_users').alias('unique_users')) \
             .orderBy('window_end', 'store_id', F.desc('unique_users'))
 
-    print("="*5, "ENVIANDO PARA O REDIS")
+    print("="*5, "ENVIANDO A TAREFA 3 PARA O REDIS", "="*5)
     df_task3_last_data = get_df_last_minute(df_task3, 'window_end', 'store_id', ['name', 'unique_users', 'window_start', 'window_end'])
     send_to_redis_as_dict(redis_client, df_task3_last_data, 'unique_users_per_minute')
 
 
     # ---------- Task 4 ----------
-    print("="*5, "Ranking dos produtos mais visualizados por hora:")
+    print("="*5, "Calculando o número de visualizações de cada produto por hora", "="*5)
     df_task4 = get_view_ranking_hour(df_user_view, product_df)
     df_task4 = df_task4.withColumn('window_start', F.col('window')['start'].cast('string')) \
         .withColumn('window_end', F.col('window')['end']) \
@@ -322,15 +313,15 @@ def process_data(redis_client, spark_local, spark_post, log_files, df_tasks={}):
             .agg(F.sum('views').alias('views')) \
             .orderBy('window_end', 'store_id', F.desc('views'))
 
-    print("="*5, "ENVIANDO PARA O REDIS")
+    print("="*5, "ENVIANDO A TAREFA 4 PARA O REDIS", "="*5)
     df_task4_last_data = get_df_last_minute(df_task4, 'window_end', 'store_id', ['name', 'views', 'window_start', 'window_end'])
     send_to_redis_as_dict(redis_client, df_task4_last_data, 'ranking_viewed_products_per_hour')
 
 
     # ---------- Task 5 ----------
     # PRECISA CALCULAR A MEDIANA DESSES DADOS
+    print("="*5, "Calculando a mediana do número de vezes que um usuário visualiza um produto antes de efetuar uma compra", "="*5)
     df_task5 = median_views_before_buy(df_user_view, df_user_buy)
-    print("="*5, "Mediana do número de vezes que um usuário visualiza um produto antes de efetuar uma compra:")
 
     # If there is already data in the df_tasks, merge the dataframes
     if df_tasks.get('median_views_before_buy'):
@@ -340,7 +331,7 @@ def process_data(redis_client, spark_local, spark_post, log_files, df_tasks={}):
             .agg(F.sum('count').alias('count')) \
             .orderBy('store_id', 'views')
 
-    print("="*5, "ENVIANDO PARA O REDIS")
+    print("="*5, "ENVIANDO A TAREFA 5 PARA O REDIS", "="*5)
     df_task5_grouped = get_df_grouped(df_task5, 'store_id', ['views', 'count'])
     send_to_redis_as_dict(redis_client, df_task5_grouped, 'median_views_before_buy')
 
