@@ -10,7 +10,12 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      -  "6379:6379"
 
   create_tables:
     image: create_tables:latest
@@ -44,6 +49,8 @@ services:
       - DB_PASSWORD=mypassword
       - DB_HOST=postgres
       - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     volumes:
       - ./mock/mock_files:/historic_spark/mock_files
       - ./tasks:/historic_spark/tasks
