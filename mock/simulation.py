@@ -110,8 +110,7 @@ class Simulation:
 
     
     def run(self):
-        # while True:
-        for _ in range(5): # Limiting the number of cycles for debugging purposes
+        while True:
             self.cycle += 1
 
             # CONTA VERDE
