@@ -7,6 +7,23 @@ import json
 
 DEBUG = False
 
+def remove_zero_level_nesting(d):
+    """
+    Remove the specific "0" level nesting from the dictionary.
+
+    :param d: The dictionary with a specific nesting level to remove
+    :return: A dictionary with the "0" level nesting removed
+    """
+    flattened = {}
+    for outer_key, inner_dict in d.items():
+        if '0' in inner_dict:
+            # Promote the "0" level contents to the outer key
+            flattened[outer_key] = inner_dict['0']
+        else:
+            # If "0" level is not present, just copy the outer_dict key-value pairs
+            flattened[outer_key] = inner_dict
+    return flattened
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
@@ -24,6 +41,13 @@ def fetch_data():
     # Deserialize purchases_per_minute
     for key in purchases_per_minute:
         purchases_per_minute[key] = json.loads(purchases_per_minute[key])
+
+    # save the data to a file
+    with open('purchases_per_minute.json', 'w') as f:
+        json.dump(purchases_per_minute, f)
+
+    # Remove the "0" level nesting from purchases_per_minute
+    purchases_per_minute = remove_zero_level_nesting(purchases_per_minute)
     
     ###############################################################################################################
 
@@ -55,39 +79,37 @@ def main():
     store_ids = [int(store_id) for store_id in store_ids]
     # Sort store IDs
     store_ids = sorted(store_ids)
+    # Convert store_ids back to strings
+    store_ids = [str(store_id) for store_id in store_ids]
     # Add an option "All" to select all stores
     # store_ids.insert(0, "All")
 
     # Sidebar for store selection
     selected_store = st.sidebar.selectbox("Select a Store", store_ids)
 
-    # print("selected_store", selected_store)
-    # print("store_ids", store_ids)
-    # print("purchases_per_minute", purchases_per_minute)
-
-    st.write("selected_store", selected_store)
-    st.write("store_ids", store_ids)
-    st.write("purchases_per_minute", purchases_per_minute)
+    # st.write("selected_store", selected_store)
+    # st.write("store_ids", store_ids)
+    # st.write("purchases_per_minute", purchases_per_minute)
 
     # If a specific store is selected, filter the data
     if selected_store != "All":
-        purchases_per_minute = {selected_store: purchases_per_minute[selected_store][0]}
-        revenue_per_minute = {selected_store: revenue_per_minute[selected_store][0]}
+        purchases_per_minute = {selected_store: purchases_per_minute[selected_store]}
+        # revenue_per_minute = {selected_store: revenue_per_minute[selected_store]}
     else:
         # If all stores are selected, calculate the total purchases and revenue
 
         # Initialize total purchases and revenue as the window start/end of the first store
         total_purchases = {"window_start": purchases_per_minute["1"]["window_start"], "window_end": purchases_per_minute["1"]["window_end"], "count": 0}
-        total_revenue = {"window_start": revenue_per_minute["1"]["window_start"], "window_end": revenue_per_minute["1"]["window_end"], "value": 0}
+        # total_revenue = {"window_start": revenue_per_minute["1"]["window_start"], "window_end": revenue_per_minute["1"]["window_end"], "value": 0}
 
         # Accumulate values from stores
         for store in purchases_per_minute:
-            total_purchases["count"] += purchases_per_minute[store][0]["count"]
-            total_revenue["value"] += revenue_per_minute[store][0]["value"]
+            total_purchases["count"] += purchases_per_minute[store]["count"]
+            # total_revenue["value"] += revenue_per_minute[store]["value"]
 
         # Update the data for all stores
         purchases_per_minute = {"All": total_purchases}
-        revenue_per_minute = {"All": total_revenue}
+        # revenue_per_minute = {"All": total_revenue}
 
     if selected_store == "All":
         selected_store_label = "All Stores"
