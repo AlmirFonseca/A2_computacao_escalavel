@@ -4,6 +4,8 @@ import time
 import logging
 from datetime import datetime, timedelta
 import json
+import matplotlib.pyplot as plt
+import altair as alt
 
 DEBUG = False
 
@@ -37,18 +39,23 @@ redis_client = get_redis_client()
 # Function to fetch data from Redis
 @st.cache_data(ttl=10)
 def fetch_data():
+    
+    # Purchases per minute
+    ###############################################################################################################
+
     purchases_per_minute = redis_client.hgetall("purchases_per_minute")
     # Deserialize purchases_per_minute
     for key in purchases_per_minute:
         purchases_per_minute[key] = json.loads(purchases_per_minute[key])
 
-    # save the data to a file
+    # Save the data to a file
     with open('purchases_per_minute.json', 'w') as f:
         json.dump(purchases_per_minute, f)
 
     # Remove the "0" level nesting from purchases_per_minute
     purchases_per_minute = remove_zero_level_nesting(purchases_per_minute)
     
+    # Revenue per minute
     ###############################################################################################################
 
     revenue_per_minute = redis_client.hgetall("revenue_per_minute")
@@ -56,16 +63,58 @@ def fetch_data():
     for key in revenue_per_minute:
         revenue_per_minute[key] = json.loads(revenue_per_minute[key])
 
+    # Save the data to a file
+    with open('revenue_per_minute.json', 'w') as f:
+        json.dump(revenue_per_minute, f)
+
+    # Remove the "0" level nesting from revenue_per_minute
+    revenue_per_minute = remove_zero_level_nesting(revenue_per_minute)
+
+    # Unique viewers per minute
     ###############################################################################################################
 
-    most_viewed_products = redis_client.zrevrange("most_viewed_products", 0, -1, withscores=True)
+    unique_users_per_minute = redis_client.hgetall("unique_users_per_minute")
+    # Deserialize unique_users_per_minute
+    for key in unique_users_per_minute:
+        unique_users_per_minute[key] = json.loads(unique_users_per_minute[key])
+
+    # Save the data to a file
+    with open('unique_users_per_minute.json', 'w') as f:
+        json.dump(unique_users_per_minute, f)
+
+    # Most Viewed Products per hour
+    ###############################################################################################################
+
+    most_viewed_products = redis_client.hgetall("ranking_viewed_products_per_hour")
+    # Deserialize unique_users_per_minute
+    for key in most_viewed_products:
+        most_viewed_products[key] = json.loads(most_viewed_products[key])
+
+    # Save the data to a file
+    with open('most_viewed_products.json', 'w') as f:
+        json.dump(most_viewed_products, f)
+
+    # Median of the views before buying
+    ###############################################################################################################
+
+    median_views_before_buying = redis_client.hgetall("median_views_before_buy")
+    # Deserialize median_views_before_buying
+    for key in median_views_before_buying:
+        median_views_before_buying[key] = json.loads(median_views_before_buying[key])
+
+    # Save the data to a file
+    with open('median_views_before_buying.json', 'w') as f:
+        json.dump(median_views_before_buying, f)
+
+    # Sold out products
+    ###############################################################################################################
+
     sold_out_products = redis_client.smembers("sold_out_products")
 
     # Get the number of stores, as keys in "purchases_per_minute" are store IDs
-    num_stores = len(purchases_per_minute)
     stores = list(purchases_per_minute.keys())
     
-    return stores, purchases_per_minute, revenue_per_minute, most_viewed_products, sold_out_products
+    return stores, purchases_per_minute, revenue_per_minute, unique_users_per_minute, most_viewed_products, median_views_before_buying, sold_out_products
 
 def main():
     st.title("E-commerce Dashboard")
@@ -74,70 +123,187 @@ def main():
     interval = st.sidebar.slider("Polling Interval (seconds)", min_value=1, max_value=60, value=10)
 
     # Fetch data
-    store_ids, purchases_per_minute, revenue_per_minute, most_viewed_products, sold_out_products = fetch_data()
-    # Convert store IDs to integers
-    store_ids = [int(store_id) for store_id in store_ids]
+    store_ids, purchases_per_minute, revenue_per_minute, unique_users_per_minute, most_viewed_products, median_views_before_buying, sold_out_products = fetch_data()
     # Sort store IDs
     store_ids = sorted(store_ids)
-    # Convert store_ids back to strings
-    store_ids = [str(store_id) for store_id in store_ids]
-    # Add an option "All" to select all stores
-    # store_ids.insert(0, "All")
+
+    # Shorten the store IDs to the last 10 characters
+    shortened_store_ids = [store_id[-10:] for store_id in store_ids]
 
     # Sidebar for store selection
-    selected_store = st.sidebar.selectbox("Select a Store", store_ids)
+    selected_shortened_store_id = st.sidebar.selectbox("Select a Store", shortened_store_ids)
 
-    # st.write("selected_store", selected_store)
+    # Get the full store ID based on the shortenned store ID
+    selected_store_full_id = next(store_id for store_id in store_ids if store_id.endswith(selected_shortened_store_id))
+
+    # st.write("selected_store_full_id", selected_store_full_id)
     # st.write("store_ids", store_ids)
+    # st.write("shortened_store_ids", shortened_store_ids)
     # st.write("purchases_per_minute", purchases_per_minute)
+    # st.write("purchases_per_minute(ALL)", purchases_per_minute.get("All"))
+    # st.write("purchases_per_minute(selected)", purchases_per_minute.get(selected_store_full_id))
 
-    # If a specific store is selected, filter the data
-    if selected_store != "All":
-        purchases_per_minute = {selected_store: purchases_per_minute[selected_store]}
-        # revenue_per_minute = {selected_store: revenue_per_minute[selected_store]}
-    else:
-        # If all stores are selected, calculate the total purchases and revenue
+    # Filter the data based on the selected store
+    purchases_per_minute = {selected_store_full_id: purchases_per_minute[selected_store_full_id]}
+    revenue_per_minute = {selected_store_full_id: revenue_per_minute[selected_store_full_id]}
+    unique_users_per_minute = {selected_store_full_id: unique_users_per_minute[selected_store_full_id]}
+    most_viewed_products = {selected_store_full_id: most_viewed_products[selected_store_full_id]}
 
-        # Initialize total purchases and revenue as the window start/end of the first store
-        total_purchases = {"window_start": purchases_per_minute["1"]["window_start"], "window_end": purchases_per_minute["1"]["window_end"], "count": 0}
-        # total_revenue = {"window_start": revenue_per_minute["1"]["window_start"], "window_end": revenue_per_minute["1"]["window_end"], "value": 0}
-
-        # Accumulate values from stores
-        for store in purchases_per_minute:
-            total_purchases["count"] += purchases_per_minute[store]["count"]
-            # total_revenue["value"] += revenue_per_minute[store]["value"]
-
-        # Update the data for all stores
-        purchases_per_minute = {"All": total_purchases}
-        # revenue_per_minute = {"All": total_revenue}
-
-    if selected_store == "All":
+    # Update the label based on the selected store
+    if selected_store_full_id == "All":
         selected_store_label = "All Stores"
     else:
-        selected_store_label = f"the Store Num. {selected_store}"
+        selected_store_label = f"the Store with ID {selected_shortened_store_id}"
     st.header(f"Dashboard Insights for {selected_store_label}")
 
-    # Horizontal line
     st.markdown("---")
     
+
     # Purchases per minute
+    ###############################################################################################################
+
     st.subheader("Purchases per Minute")
-    purchases = purchases_per_minute.get(selected_store, {"window_start": "N/A", "window_end": "N/A", "count": "N/A"})
+    purchases = purchases_per_minute.get(selected_store_full_id, {"window_start": "N/A", "window_end": "N/A", "count": "N/A"})
     if DEBUG:
-        st.write(purchases)
+        st.write("purchases", purchases)
     st.write(f'**{purchases.get("count")}** purchases per minute ({purchases.get("window_start")} - {purchases.get("window_end")})')
 
-    # # # Revenue per minute
-    # # st.subheader("Revenue per Minute")
-    # # revenues = revenue_per_minute.get(selected_store, {"window_start": "N/A", "window_end": "N/A", "count": "N/A"})
-    # # if DEBUG:
-    # #     st.write(revenues)
-    # # st.write(f'**$ {revenues.get("value"):.2f}** of revenue per minute ({revenues.get("window_start")} - {revenues.get("window_end")})')
+    st.markdown("---")
 
+
+    # Revenue per minute
+    ###############################################################################################################
     
+    st.subheader("Revenue per Minute")
+    revenues = revenue_per_minute.get(selected_store_full_id, {"window_start": "N/A", "window_end": "N/A", "count": "N/A"})
+    if DEBUG:
+        st.write("revenues", revenues)
+    st.write(f'**$ {revenues.get("amount_earned"):.2f}** of revenue per minute ({revenues.get("window_start")} - {revenues.get("window_end")})')
+
+    st.markdown("---")
+
+
+    # Unique viewers per minute
+    ###############################################################################################################
     
-    # st.subheader("Most Viewed Products (Last Hour)")
-    # st.write(most_viewed_products)
+    st.subheader("Unique Viewers per Minute")
+
+    if DEBUG:
+        st.write("unique_users_per_minute", unique_users_per_minute)
+
+    # Flatten the dictionary
+    unique_users_per_minute = list(list(unique_users_per_minute.values())[0].values())
+
+    # Sort the data based on the unique users
+    unique_users_per_minute = sorted(unique_users_per_minute, key=lambda x: x['unique_users'], reverse=True)
+
+    # Extract names of the products and unique_users
+    names = [item['name'] for item in unique_users_per_minute]
+    unique_users = [item['unique_users'] for item in unique_users_per_minute]
+
+    # Prepare data for Altair chart
+    chart_data = [dict(Products=name, Unique_Users=users) for name, users in zip(names, unique_users)]
+
+    # Create Altair chart
+    chart = alt.Chart(alt.Data(values=chart_data), height=400).mark_bar().encode(
+        x=alt.X('Unique_Users:Q', title='Unique Users'),
+        y=alt.Y('Products:N', sort='-x', title='Products')
+    ).properties(
+        title='Product Viewers Ranking'
+    )
+
+    # Unique viewers per minute
+    st.subheader("Unique Viewers per Minute")
+
+    # Display chart using Streamlit
+    st.altair_chart(chart, use_container_width=True)
+
+    # Adding the timestamps as caption
+    caption = f"Data window: ({unique_users_per_minute[0]['window_start']} - {unique_users_per_minute[0]['window_end']})"
+    st.caption(caption)
+
+    st.markdown("---")
+
+
+    # Most Viewed Products per hour
+    ###############################################################################################################
+    
+    st.subheader("Most Viewed Products per hour")
+
+    if DEBUG:
+        st.write("most_viewed_products", most_viewed_products)
+
+    # Flatten the dictionary
+    most_viewed_products = list(list(most_viewed_products.values())[0].values())
+
+    # Sort the data based on the views
+    most_viewed_products = sorted(most_viewed_products, key=lambda x: x['views'], reverse=True)
+
+    # Extract names of the products and unique_users
+    names = [item['name'] for item in most_viewed_products]
+    views = [item['views'] for item in most_viewed_products]
+
+    # Prepare data for Altair chart
+    chart_data = [dict(Products=name, Views=views) for name, views in zip(names, views)]
+
+    # Create Altair chart
+    chart = alt.Chart(alt.Data(values=chart_data), height=400).mark_bar().encode(
+        x=alt.X('Views:Q', title='Views'),
+        y=alt.Y('Products:N', sort='-x', title='Products')
+    ).properties(
+        title='Popular Products Ranking'
+    )
+
+    # Most Viewed Products per hour
+    st.subheader("Most Viewed Products per hour")
+
+    # Display chart using Streamlit
+    st.altair_chart(chart, use_container_width=True)
+
+    # Adding the timestamps as caption
+    caption = f"Data window: ({most_viewed_products[0]['window_start']} - {most_viewed_products[0]['window_end']})"
+    st.caption(caption)
+
+    st.markdown("---")
+
+
+    # Median of the views before buying
+    ###############################################################################################################
+
+    st.subheader("Median of the views before buying")
+
+    if DEBUG:
+        st.write("median_views_before_buying", median_views_before_buying)
+
+    # Flatten the dictionary
+    median_views_before_buying = list(list(median_views_before_buying.values())[0].values())
+
+    # Sort the data based on the views, in ascending order
+    median_views_before_buying = sorted(median_views_before_buying, key=lambda x: x['views'])
+
+    # Extract number of views and multiplicities
+    views = [item['views'] for item in median_views_before_buying]
+    view_counts = [item['count'] for item in median_views_before_buying]
+
+    # Get the median of the view counts
+    sum_view_count = sum(view_counts)
+    median_index = sum_view_count // 2
+    median_view = 0
+    for view, view_count in zip(views, view_counts):
+        median_index -= view_count
+        if median_index <= 0:
+            median_index = max(0, median_index)
+            median_view = view
+            break
+
+    st.write(f'The median of the views before buying is **{median_view}**')
+    st.caption(f'The views are from {views[0]} to {views[-1]}, with a sum of {sum_view_count} views')
+
+    st.markdown("---")
+
+
+    # # Sold out products
+    # ###############################################################################################################
     
     # st.subheader("Sold Out Products")
     # st.write(sold_out_products)
