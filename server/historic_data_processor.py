@@ -192,10 +192,6 @@ def get_df_last_minute(df, window_column, column_name, columns_list):
 
     return get_df_grouped(df, column_name, columns_list)
 
-<<<<<<< HEAD
-=======
-
->>>>>>> e5ed17e2cc1278756a79316307a69ee9182d596a
 # Function to send the dataframe to the redis as a dictionary
 def send_to_redis_as_dict(redis_client, df, task_name, column_name = 'store_id'):
     for row in df.collect():
@@ -205,16 +201,8 @@ def send_to_redis_as_dict(redis_client, df, task_name, column_name = 'store_id')
             data[i] = {detail_key: detail_value for detail_key, detail_value in detail.asDict().items()}
             if i == 9:
                 break
-<<<<<<< HEAD
 
-=======
->>>>>>> e5ed17e2cc1278756a79316307a69ee9182d596a
         redis_client.hset(task_name, str(row[column_name]), json.dumps(data))
-
-        # Save a copy of the dictionary into a json file (just for DEBUG)
-        json.dump(data, open(f'{task_name}.json', 'w'))
-
-
 
 
 # Create a spark session to read the postgres database
