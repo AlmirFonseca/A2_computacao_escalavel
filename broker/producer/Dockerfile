@@ -16,5 +16,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 # RUN chmod +x start.sh
 
 # Run producer.py when the container launches
-CMD ["python", "./producer.py"]
+CMD ["python", "-u", "./producer.py"]
 # CMD ["./start.sh"]
