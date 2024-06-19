@@ -226,7 +226,7 @@ df_task1.show()
 print("="*5, "ENVIANDO PARA O REDIS")
 
 # Get the last minute of the dataframe for each store
-df_task1_last_data = get_df_last_minute(df_task1, 'end', 'store_id', ['count', 'start', 'end'])
+df_task1_last_data = get_df_last_minute(df_task1, 'end', 'store_id', ['count', 'window_start', 'window_end'])
 send_to_redis_as_dict(r, df_task1_last_data, 'purchases_per_minute')
 
 # Testing redis
@@ -246,7 +246,7 @@ df_task2.show()
 print("="*5, "ENVIANDO PARA O REDIS")
 
 # Obtain the last minute of the dataframe for each store
-df_task2_last_data = get_df_last_minute(df_task2, 'end', 'store_id', ['amount_earned', 'start', 'end'])
+df_task2_last_data = get_df_last_minute(df_task2, 'end', 'store_id', ['value', 'window_start', 'window_end'])
 send_to_redis_as_dict(r, df_task2_last_data, 'revenue_per_minute')
 
 # Testing redis
