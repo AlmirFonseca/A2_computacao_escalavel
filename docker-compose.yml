@@ -49,6 +49,33 @@ services:
       - ./tasks:/historic_spark/tasks
     command: python historic_data_processor.py
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"  # RabbitMQ default port
+      - "15672:15672"  # RabbitMQ management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest  # Default RabbitMQ user (change in production)
+      RABBITMQ_DEFAULT_PASS: guest  # Default RabbitMQ password (change in production)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "status"]
+      interval: 10s
+      retries: 10
+
+  # producer:
+  #   build:
+  #     context: ./broker/producer
+  #   # restart: on-failure
+  #   depends_on:
+  #     - rabbitmq
+
+  # consumer:
+  #   build:
+  #     context: ./broker/consumer
+  #   # restart: on-failure
+  #   depends_on:
+  #     - rabbitmq
+
 
 volumes:
   postgres_data:
