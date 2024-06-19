@@ -2,7 +2,8 @@ from celery import Celery
 import psycopg2
 from psycopg2 import pool
 import json
-# Run with "celery -A mock_server worker --loglevel=INFO --concurrency=10"
+import os
+# Run with "celery -A mock_celery worker --loglevel=INFO --concurrency=10"
 
 
 app = Celery('tasks', broker='pyamqp://guest@localhost//')
@@ -15,11 +16,11 @@ jdbc_driver_path = "../jdbc/postgresql-42.7.3.jar"
 
 # Propriedades de conexão com o banco de dados
 db_properties = {
-    "user": config['db_user'],
-    "password": config['db_password'],
-    "host": "localhost",
-    "port": "5432",
-    "dbname": "source_db"
+    'dbname': os.environ.get('DB_NAME'),
+    'user': os.environ.get('DB_USER'),
+    'password': os.environ.get('DB_PASSWORD'),
+    'host': os.environ.get('DB_HOST'),
+    'port': os.environ.get('DB_PORT')
 }
 
 db_pool = psycopg2.pool.SimpleConnectionPool(1, 20, **db_properties)

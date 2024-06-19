@@ -103,5 +103,20 @@ services:
     environment:
       - REDIS_HOST=redis
 
+  celery-worker:
+    build: ./celery
+    depends_on:
+      - rabbitmq
+      - postgres
+    environment:
+      - DB_NAME=mydatabase
+      - DB_USER=myuser
+      - DB_PASSWORD=mypassword
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - CELERY_BROKER_URL=amqp://guest@rabbitmq:5672//
+      - CELERY_RESULT_BACKEND=rpc://
+    command: celery -A mock_celery worker --loglevel=INFO --concurrency=10
+
 volumes:
   postgres_data:
