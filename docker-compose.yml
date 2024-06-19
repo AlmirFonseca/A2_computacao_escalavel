@@ -87,6 +87,15 @@ services:
   #   environment:
   #     RABBITMQ_HOST: rabbitmq
 
+  streamlit:
+    build:
+      context: ./dashboard
+    ports:
+      - "8501:8501"
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=redis
 
 volumes:
   postgres_data:
