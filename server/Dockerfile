@@ -6,7 +6,7 @@ ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
 # SET WORKDIR
-WORKDIR /historic_spark
+WORKDIR /processor
 
 # INSTALL OPENJDK-11
 RUN apt-get update && \
@@ -31,4 +31,4 @@ RUN set -ex \
 
 
 # COPY APPLICATION
-COPY ./historic_data_processor.py .
+COPY ./data_processor.py .
