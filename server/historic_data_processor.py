@@ -205,6 +205,9 @@ def send_to_redis_as_dict(redis_client, df, task_name, column_name = 'store_id')
         redis_client.hset(task_name, str(row[column_name]), json.dumps(data))
 
 
+# z
+# def process_data():
+
 # Create a spark session to read the postgres database
 spark_post = create_spark_session_postgres()
 
@@ -226,7 +229,6 @@ while True:
             .option("password", POSTGREE_CREDENTIALS['password']) \
             .option("driver", "org.postgresql.Driver") \
             .load()
-        product_df = product_df.withColumn('store_id', F.col('store_id').cast('integer'))
         product_df.show()
         break
     except Exception as e:
