@@ -9,6 +9,11 @@ import time
 import cade_analytics
 import conta_verde
 import datacat
+import requests
+import threading
+import time
+import random
+import json
 
 @dataclass
 class SimulationParams:
@@ -47,6 +52,10 @@ class Simulation:
         self.user_flow_report = []
 
         self.G = G
+        
+        # URL of the server to publish logs to
+        self.SERVER_URL = "http://localhost:5000/log"
+
 
         self.store_folder_name = f"store_{self.params.store_id}"
 
@@ -208,7 +217,21 @@ class Simulation:
 
     def __add_message_to_user_flow_report(self, message):
         cur_time = self.get_timestamp_string()
-        self.user_flow_report.append(cur_time + message)
+        msg = cur_time + message
+        self.send_message_to_server(msg)
+        self.user_flow_report.append(msg)
+    
+    def send_message_to_server(self, message):
+        # sends to the server
+        try:
+            print("Sending log to URL!!!!!!!!!!!!!!!!!!!!!!!!!\n\n\n\n")
+            # requests.post(self.SERVER_URL, data=message.encode('utf-8'), timeout=1)
+            # requests.post(f"{self.SERVER_URL}", data=message.encode('utf-8'), timeout=1)
+            requests.post(self.SERVER_URL, data=message.encode('utf-8'))
+
+        except requests.exceptions.RequestException as e:
+            print(f"\nError sending log to URL: {e}\n")
+
 
     def __home(self, user):
         msg = f";{self.params.store_id};User;{user};{STIMUL_SCROLLING};{HOME}.\n"
