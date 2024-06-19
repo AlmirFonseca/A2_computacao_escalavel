@@ -69,41 +69,41 @@ def main():
     st.write("store_ids", store_ids)
     st.write("purchases_per_minute", purchases_per_minute)
 
-    # # If a specific store is selected, filter the data
-    # if selected_store != "All":
-    #     purchases_per_minute = {selected_store: purchases_per_minute[selected_store]}
-    #     revenue_per_minute = {selected_store: revenue_per_minute[selected_store]}
-    # else:
-    #     # If all stores are selected, calculate the total purchases and revenue
+    # If a specific store is selected, filter the data
+    if selected_store != "All":
+        purchases_per_minute = {selected_store: purchases_per_minute[selected_store][0]}
+        revenue_per_minute = {selected_store: revenue_per_minute[selected_store][0]}
+    else:
+        # If all stores are selected, calculate the total purchases and revenue
 
-    #     # Initialize total purchases and revenue as the window start/end of the first store
-    #     total_purchases = {"window_start": purchases_per_minute["1"]["window_start"], "window_end": purchases_per_minute["1"]["window_end"], "count": 0}
-    #     total_revenue = {"window_start": revenue_per_minute["1"]["window_start"], "window_end": revenue_per_minute["1"]["window_end"], "value": 0}
+        # Initialize total purchases and revenue as the window start/end of the first store
+        total_purchases = {"window_start": purchases_per_minute["1"]["window_start"], "window_end": purchases_per_minute["1"]["window_end"], "count": 0}
+        total_revenue = {"window_start": revenue_per_minute["1"]["window_start"], "window_end": revenue_per_minute["1"]["window_end"], "value": 0}
 
-    #     # Accumulate values from stores
-    #     for store in purchases_per_minute:
-    #         total_purchases["count"] += purchases_per_minute[store]["count"]
-    #         total_revenue["value"] += revenue_per_minute[store]["value"]
+        # Accumulate values from stores
+        for store in purchases_per_minute:
+            total_purchases["count"] += purchases_per_minute[store][0]["count"]
+            total_revenue["value"] += revenue_per_minute[store][0]["value"]
 
-    #     # Update the data for all stores
-    #     purchases_per_minute = {"All": total_purchases}
-    #     revenue_per_minute = {"All": total_revenue}
+        # Update the data for all stores
+        purchases_per_minute = {"All": total_purchases}
+        revenue_per_minute = {"All": total_revenue}
 
-    # if selected_store == "All":
-    #     selected_store_label = "All Stores"
-    # else:
-    #     selected_store_label = f"the Store Num. {selected_store}"
-    # st.header(f"Dashboard Insights for {selected_store_label}")
+    if selected_store == "All":
+        selected_store_label = "All Stores"
+    else:
+        selected_store_label = f"the Store Num. {selected_store}"
+    st.header(f"Dashboard Insights for {selected_store_label}")
 
-    # # Horizontal line
-    # st.markdown("---")
+    # Horizontal line
+    st.markdown("---")
     
-    # # Purchases per minute
-    # st.subheader("Purchases per Minute")
-    # purchases = purchases_per_minute.get(selected_store, {"window_start": "N/A", "window_end": "N/A", "count": "N/A"})
-    # if DEBUG:
-    #     st.write(purchases)
-    # st.write(f'**{purchases.get("count")}** purchases per minute ({purchases.get("window_start")} - {purchases.get("window_end")})')
+    # Purchases per minute
+    st.subheader("Purchases per Minute")
+    purchases = purchases_per_minute.get(selected_store, {"window_start": "N/A", "window_end": "N/A", "count": "N/A"})
+    if DEBUG:
+        st.write(purchases)
+    st.write(f'**{purchases.get("count")}** purchases per minute ({purchases.get("window_start")} - {purchases.get("window_end")})')
 
     # # # Revenue per minute
     # # st.subheader("Revenue per Minute")
