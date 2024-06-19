@@ -54,6 +54,7 @@ services:
       - REDIS_PORT=6379
     volumes:
       - ./mock/mock_files:/processor/mock_files
+      - ./tasks:/processor/tasks
     command: python data_processor.py
 
   rabbitmq:
