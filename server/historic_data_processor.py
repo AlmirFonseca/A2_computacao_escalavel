@@ -49,21 +49,20 @@ def create_spark_session_postgres():
     return spark
 
 
-# get all files in mock\mock_files\log folder
-def get_log_files(log_path):
+# get all files in mock\mock_files\log folder removing the already read files
+def get_log_files(log_path, already_read_files=[]):
     log_files = []
 
     # Get all files inside the folders in the log_path
     for root, _, files in os.walk(log_path):
-        files = [root + "/" + file for file in files]
+        files = [root + "/" + file for file in files if (root + "/" + file) not in already_read_files]
         log_files.extend(files)
     
     return log_files
 
 
 #  Read all files and put them in the same spark dataframe
-def read_files(spark, log_path):
-    log_files = get_log_files(log_path)
+def read_files(spark, log_files):
     df = spark.read.option("delimiter", ";").option("header", True).csv(log_files[0])
     for file in log_files[1:]:
         df = df.union(spark.read.option("delimiter", ";").option("header", True).csv(file))
@@ -72,7 +71,7 @@ def read_files(spark, log_path):
     # create a new column with the datetime
     df = df.withColumn('datetime', (F.col('timestamp') / 1e9).cast(TimestampType()))
 
-    return df
+    return df, log_files
 
 
 # Process the df to get count of products bought per minute
@@ -205,138 +204,186 @@ def send_to_redis_as_dict(redis_client, df, task_name, column_name = 'store_id')
         redis_client.hset(task_name, str(row[column_name]), json.dumps(data))
 
 
-# z
-# def process_data():
+# Function to process all the data
+def process_data(redis_client, spark_local, spark_post, log_files, df_tasks={}):
+    df, files_already_read = read_files(spark_local, log_files)
+    df.show()
+
+    jdbc_url = f"jdbc:postgresql://{POSTGREE_CREDENTIALS['host']}:{POSTGREE_CREDENTIALS['port']}/{POSTGREE_CREDENTIALS['dbname']}"
+
+    # Try to read the products table
+    while True:
+        try:
+            product_df = spark_post.read.format("jdbc") \
+                .option("url", jdbc_url) \
+                .option("dbtable", "conta_verde.products") \
+                .option("user", POSTGREE_CREDENTIALS['user']) \
+                .option("password", POSTGREE_CREDENTIALS['password']) \
+                .option("driver", "org.postgresql.Driver") \
+                .load()
+            product_df.show()
+            break
+        except Exception as e:
+            print("The products table isn't available yet: ", e)
+            time.sleep(5)
+
+
+    print("="*5, "Processing the data", "="*5)
+
+    # Filter the data to get only the buys and the views
+    df_user_buy = df.filter(df["type"] == "Audit").filter(df["extra_1"] == "BUY") # Get only the buys
+
+    df_user_view = df.filter(df["type"] == "User").filter(df["extra_1"] == "ZOOM") # Get only the views of the products
+    df_user_view = df_user_view.withColumn('extra_2', F.regexp_replace('extra_2', 'VIEW_PRODUCT ', '')) # Remove the 'VIEW_PRODUCT ' from the extra_2 column
+    df_user_view = df_user_view.withColumn('extra_2', F.regexp_replace('extra_2', '\.$', '')) # Remove the final '.' from the extra_2 column
+
+
+    # ---------- Task 1 ----------
+    print("="*5, "Número de produtos comprados por minuto:")
+    df_task1 = products_bought_minute(df_user_buy)
+    df_task1 = df_task1.withColumn('window_start', F.col('window')['start'].cast('string')) \
+        .withColumn('window_end', F.col('window')['end']) \
+        .drop('window')
+    
+    # If there is already data in the df_tasks, merge the dataframes
+    if df_tasks.get('purchases_per_minute'):
+        # Merge the dataframes, summing grouped by window_start, window_end, store_id and count
+        df_task1 = df_task1.unionByName(df_tasks['purchases_per_minute']) \
+            .groupBy('window_start', 'window_end', 'store_id') \
+            .agg(F.sum('count').alias('count')) \
+            .orderBy('window_end', 'store_id')
+        
+    df_task1.show()
+
+    print("="*5, "ENVIANDO PARA O REDIS")
+    # Get the last minute of the dataframe for each store
+    df_task1_last_data = get_df_last_minute(df_task1, 'window_end', 'store_id', ['count', 'window_start', 'window_end'])
+    send_to_redis_as_dict(redis_client, df_task1_last_data, 'purchases_per_minute')
+
+    # Testing redis
+    all_data = redis_client.hgetall('purchases_per_minute')
+    print("Testing - Purchases per minute")
+    for key, value in all_data.items():
+        print(key, json.loads(value))
+
+    # ---------- Task 2 ----------
+    print("="*5, "Valor faturado por minuto:")
+    df_task2 = amount_earned_minute(df_user_buy, product_df)
+    df_task2 = df_task2.withColumn('window_start', F.col('window')['start'].cast('string')) \
+        .withColumn('window_end', F.col('window')['end']) \
+        .drop('window')
+
+    # If there is already data in the df_tasks, merge the dataframes
+    if df_tasks.get('revenue_per_minute'):
+        # Merge the dataframes, summing grouped by window_start, window_end, store_id and amount_earned
+        df_task2 = df_task2.unionByName(df_tasks['revenue_per_minute']) \
+            .groupBy('window_start', 'window_end', 'store_id') \
+            .agg(F.sum('amount_earned').alias('amount_earned')) \
+            .orderBy('window_end', 'store_id')
+
+    print("="*5, "ENVIANDO PARA O REDIS")
+    # Obtain the last minute of the dataframe for each store
+    df_task2_last_data = get_df_last_minute(df_task2, 'window_end', 'store_id', ['amount_earned', 'window_start', 'window_end'])
+    send_to_redis_as_dict(redis_client, df_task2_last_data, 'revenue_per_minute')
+
+
+    # ---------- Task 3 ----------
+    print("="*5, "Número de usuários únicos visualizando cada produto por minuto:")
+    df_task3 = users_view_product_minute(df_user_view, product_df)
+    df_task3 = df_task3.withColumn('window_start', F.col('window')['start'].cast('string')) \
+        .withColumn('window_end', F.col('window')['end']) \
+        .drop('window')
+
+    # If there is already data in the df_tasks, merge the dataframes
+    if df_tasks.get('unique_users_per_minute'):
+        # Merge the dataframes, summing grouped by window_start, window_end, name and store_id
+        df_task3 = df_task3.unionByName(df_tasks['unique_users_per_minute']) \
+            .groupBy('window_start', 'window_end', 'name', 'store_id') \
+            .agg(F.sum('unique_users').alias('unique_users')) \
+            .orderBy('window_end', 'store_id', F.desc('unique_users'))
+
+    print("="*5, "ENVIANDO PARA O REDIS")
+    df_task3_last_data = get_df_last_minute(df_task3, 'window_end', 'store_id', ['name', 'unique_users', 'window_start', 'window_end'])
+    send_to_redis_as_dict(redis_client, df_task3_last_data, 'unique_users_per_minute')
+
+
+    # ---------- Task 4 ----------
+    print("="*5, "Ranking dos produtos mais visualizados por hora:")
+    df_task4 = get_view_ranking_hour(df_user_view, product_df)
+    df_task4 = df_task4.withColumn('window_start', F.col('window')['start'].cast('string')) \
+        .withColumn('window_end', F.col('window')['end']) \
+        .drop('window')
+
+    # If there is already data in the df_tasks, merge the dataframes
+    if df_tasks.get('ranking_viewed_products_per_hour'):
+        # Merge the dataframes, summing grouped by window_start, window_end, name and store_id
+        df_task4 = df_task4.unionByName(df_tasks['ranking_viewed_products_per_hour']) \
+            .groupBy('window_start', 'window_end', 'name', 'store_id') \
+            .agg(F.sum('views').alias('views')) \
+            .orderBy('window_end', 'store_id', F.desc('views'))
+
+    print("="*5, "ENVIANDO PARA O REDIS")
+    df_task4_last_data = get_df_last_minute(df_task4, 'window_end', 'store_id', ['name', 'views', 'window_start', 'window_end'])
+    send_to_redis_as_dict(redis_client, df_task4_last_data, 'ranking_viewed_products_per_hour')
+
+
+    # ---------- Task 5 ----------
+    # PRECISA CALCULAR A MEDIANA DESSES DADOS
+    df_task5 = median_views_before_buy(df_user_view, df_user_buy)
+    print("="*5, "Mediana do número de vezes que um usuário visualiza um produto antes de efetuar uma compra:")
+
+    # If there is already data in the df_tasks, merge the dataframes
+    if df_tasks.get('median_views_before_buy'):
+        # Merge the dataframes, summing grouped by views and store_id
+        df_task5 = df_task5.unionByName(df_tasks['median_views_before_buy']) \
+            .groupBy('views', 'store_id') \
+            .agg(F.sum('count').alias('count')) \
+            .orderBy('store_id', 'views')
+
+    print("="*5, "ENVIANDO PARA O REDIS")
+    df_task5_grouped = get_df_grouped(df_task5, 'store_id', ['views', 'count'])
+    send_to_redis_as_dict(redis_client, df_task5_grouped, 'median_views_before_buy')
+
+
+    # Save the dataframes in the df_tasks dictionary
+    df_tasks = {
+        'purchases_per_minute': df_task1,
+        'revenue_per_minute': df_task2,
+        'unique_users_per_minute': df_task3,
+        'ranking_viewed_products_per_hour': df_task4,
+        'median_views_before_buy': df_task5
+    }
+
+    print("="*5, "Data processing finished", "="*5)
+
+    return files_already_read, df_tasks
+
 
 # Create a spark session to read the postgres database
 spark_post = create_spark_session_postgres()
-
-# Read the log files
-log_path = './mock_files/logs/'
 spark_local = create_spark_session_local()
-df = read_files(spark_local, log_path)
-df.show()
-
-jdbc_url = f"jdbc:postgresql://{POSTGREE_CREDENTIALS['host']}:{POSTGREE_CREDENTIALS['port']}/{POSTGREE_CREDENTIALS['dbname']}"
-
-# Try to read the products table
-while True:
-    try:
-        product_df = spark_post.read.format("jdbc") \
-            .option("url", jdbc_url) \
-            .option("dbtable", "conta_verde.products") \
-            .option("user", POSTGREE_CREDENTIALS['user']) \
-            .option("password", POSTGREE_CREDENTIALS['password']) \
-            .option("driver", "org.postgresql.Driver") \
-            .load()
-        product_df.show()
-        break
-    except Exception as e:
-        print("The products table isn't available yet: ", e)
-        time.sleep(5)
-
-
-print("="*5, "Processing the data", "="*5)
 
 # Create a redis connection and flush the database
-r = redis.Redis(host=os.environ.get('REDIS_HOST'), port=os.environ.get('REDIS_PORT'))
-r.flushall()
+redis_client = redis.Redis(host=os.environ.get('REDIS_HOST'), port=os.environ.get('REDIS_PORT'))
+redis_client.flushall()
 
-# Filter the data to get only the buys and the views
-df_user_buy = df.filter(df["type"] == "Audit").filter(df["extra_1"] == "BUY") # Get only the buys
-
-df_user_view = df.filter(df["type"] == "User").filter(df["extra_1"] == "ZOOM") # Get only the views of the products
-df_user_view = df_user_view.withColumn('extra_2', F.regexp_replace('extra_2', 'VIEW_PRODUCT ', '')) # Remove the 'VIEW_PRODUCT ' from the extra_2 column
-df_user_view = df_user_view.withColumn('extra_2', F.regexp_replace('extra_2', '\.$', '')) # Remove the final '.' from the extra_2 column
+# Define the path of the log files
+log_path = './mock_files/logs/'
 
 
-df_task1 = products_bought_minute(df_user_buy)
-df_task1 = df_task1.withColumn('window_start', F.col('window')['start'].cast('string')) \
-    .withColumn('window_end', F.col('window')['end']) \
-    .drop('window')
-
-print("="*5, "Número de produtos comprados por minuto:")
-df_task1.show()
-
-print("="*5, "ENVIANDO PARA O REDIS")
-
-# Get the last minute of the dataframe for each store
-df_task1_last_data = get_df_last_minute(df_task1, 'window_end', 'store_id', ['count', 'window_start', 'window_end'])
-send_to_redis_as_dict(r, df_task1_last_data, 'purchases_per_minute')
-
-# Testing redis
-all_data = r.hgetall('purchases_per_minute')
-print("Testing - Purchases per minute")
-for key, value in all_data.items():
-    print(key, json.loads(value))
+# Initial read of the files
+initial_files = get_log_files(log_path)
+files_read, df_tasks = process_data(redis_client, spark_local, spark_post, initial_files)
 
 
-df_task2 = amount_earned_minute(df_user_buy, product_df)
-df_task2 = df_task2.withColumn('window_start', F.col('window')['start'].cast('string')) \
-    .withColumn('window_end', F.col('window')['end']) \
-    .drop('window')
-
-print("="*5, "Valor faturado por minuto:")
-df_task2.show()
-
-print("="*5, "ENVIANDO PARA O REDIS")
-
-# Obtain the last minute of the dataframe for each store
-df_task2_last_data = get_df_last_minute(df_task2, 'window_end', 'store_id', ['amount_earned', 'window_start', 'window_end'])
-send_to_redis_as_dict(r, df_task2_last_data, 'revenue_per_minute')
-
-# Testing redis
-all_data = r.hgetall('revenue_per_minute')
-for key, value in all_data.items():
-    print(key, json.loads(value))
-
-
-df_task3 = users_view_product_minute(df_user_view, product_df)
-df_task3 = df_task3.withColumn('window_start', F.col('window')['start'].cast('string')) \
-    .withColumn('window_end', F.col('window')['end']) \
-    .drop('window')
-
-print("="*5, "Número de usuários únicos visualizando cada produto por minuto:")
-df_task3.show()
-
-print("="*5, "ENVIANDO PARA O REDIS")
-df_task3_last_data = get_df_last_minute(df_task3, 'window_end', 'store_id', ['name', 'unique_users', 'window_start', 'window_end'])
-send_to_redis_as_dict(r, df_task3_last_data, 'unique_users_per_minute')
-
-# Testing redis
-all_data = r.hgetall('unique_users_per_minute')
-for key, value in all_data.items():
-    print(key, json.loads(value))
-
-
-df_task4 = get_view_ranking_hour(df_user_view, product_df)
-df_task4 = df_task4.withColumn('window_start', F.col('window')['start'].cast('string')) \
-    .withColumn('window_end', F.col('window')['end']) \
-    .drop('window')
-
-print("="*5, "Ranking dos produtos mais visualizados por hora:")
-df_task4.show()
-
-print("="*5, "ENVIANDO PARA O REDIS")
-df_task4_last_data = get_df_last_minute(df_task4, 'window_end', 'store_id', ['name', 'views', 'window_start', 'window_end'])
-send_to_redis_as_dict(r, df_task4_last_data, 'ranking_viewed_products_per_hour')
-
-# Testing redis
-all_data = r.hgetall('ranking_viewed_products_per_hour')
-for key, value in all_data.items():
-    print(key, json.loads(value))
-
-
-# PRECISA CALCULAR A MEDIANA DESSES DADOS
-df_task5 = median_views_before_buy(df_user_view, df_user_buy)
-print("="*5, "Mediana do número de vezes que um usuário visualiza um produto antes de efetuar uma compra:")
-df_task5.show()
-
-print("="*5, "ENVIANDO PARA O REDIS")
-df_task5_grouped = get_df_grouped(df_task5, 'store_id', ['views', 'count'])
-send_to_redis_as_dict(r, df_task5_grouped, 'median_views_before_buy')
-
-# Testing redis
-all_data = r.hgetall('median_views_before_buy')
-for key, value in all_data.items():
-    print(key, json.loads(value))
+# Incremental read of the files 
+while True:
+    new_files = get_log_files(log_path, files_read)
+    if len(new_files) == 0:
+        print("="*5, "No new files to process", "="*5)
+    else:
+        new_files_read, df_tasks = process_data(redis_client, spark_local, spark_post, new_files, df_tasks)
+        files_read.extend(new_files_read)
+        files_read += new_files
+    # Wait 5 seconds before checking for new files
+    time.sleep(5)
