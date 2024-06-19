@@ -72,17 +72,24 @@ def read_files(spark, log_path):
     # create a new column with the datetime
     df = df.withColumn('datetime', (F.col('timestamp') / 1e9).cast(TimestampType()))
 
-    # Convert the store_id column to integer
-    df = df.withColumn('store_id', F.col('store_id').cast('integer'))
-
     return df
 
 
 # Process the df to get count of products bought per minute
 def products_bought_minute(df_user_buy):
-    return df_user_buy.groupBy(F.window('datetime', '1 minute'), 'store_id') \
+    # Count the number of products bought per minute per store
+    df_stores = df_user_buy.groupBy(F.window('datetime', '1 minute'), 'store_id') \
         .count() \
         .orderBy('window', 'store_id')
+    
+    # Count the number of products bought per minute for all stores (store_id = All)
+    df_all = df_user_buy.groupBy(F.window('datetime', '1 minute')) \
+        .count() \
+        .orderBy('window') \
+        .withColumn('store_id', F.lit('All'))
+    
+    # Union the dataframes
+    return df_stores.unionByName(df_all)
 
 
 # Get the amount earned per minute
@@ -91,11 +98,19 @@ def amount_earned_minute(df_user_view, product_df):
     df_user_view = df_user_view.alias('df_user_view')
     df_user_view = df_user_view.join(product_df, (df_user_view["extra_2"] == product_df["id"]) & (df_user_view["store_id"] == product_df["store_id"]), "left")
 
-    # Calculate the amount earned
-    return df_user_view.groupBy(F.window('datetime', '1 minute'), 'df_user_view.store_id') \
+    # Calculate the amount earned per minute per store
+    df_store = df_user_view.groupBy(F.window('datetime', '1 minute'), 'df_user_view.store_id') \
         .agg(F.sum(F.col('price').cast('int')).alias('amount_earned')) \
         .orderBy('window', 'store_id')
         
+    # Calculate the amount earned per minute for all stores (store_id = All)
+    df_all = df_user_view.groupBy(F.window('datetime', '1 minute')) \
+        .agg(F.sum(F.col('price').cast('int')).alias('amount_earned')) \
+        .orderBy('window') \
+        .withColumn('store_id', F.lit('All'))
+    
+    # Union the dataframes (by column names)
+    return df_store.unionByName(df_all)
 
 
 # Process the df to get the number of unique users that viewed a product per minute
@@ -104,15 +119,17 @@ def users_view_product_minute(df_user_view, product_df):
     df_user_view = df_user_view.alias('df_user_view')
     df_user_view = df_user_view.join(product_df, (df_user_view["extra_2"] == product_df["id"]) & (df_user_view["store_id"] == product_df["store_id"]), "left")
 
-    df_final = df_user_view.groupBy(F.window('datetime', '1 minute'), 'name', 'df_user_view.store_id') \
+    # Distinct count of users that viewed a product per minute per store
+    df_store = df_user_view.groupBy(F.window('datetime', '1 minute'), 'name', 'df_user_view.store_id') \
         .agg(F.countDistinct('content').alias('unique_users'))
+
+    # Distinct count of users that viewed a product per minute for all stores (store_id = All)
+    df_all = df_user_view.groupBy(F.window('datetime', '1 minute'), 'name') \
+        .agg(F.countDistinct('content').alias('unique_users')) \
+        .withColumn('store_id', F.lit('All'))
     
-    # Window to get the top 10 of each group
-    window = Window.partitionBy('window', 'store_id').orderBy(F.desc("unique_users"))
-    
-    # Group the dataframe by window, store_id and unique_users and get the top 10 of each group
-    return df_final.withColumn('rank', F.dense_rank().over(window)) \
-        .filter(F.col('rank') <= 10)
+    # Group the dataframe by window, store_id and unique_users
+    return df_store.unionByName(df_all)
 
 
 # Get ranking of the most viewed products per hour
@@ -121,15 +138,17 @@ def get_view_ranking_hour(df_user_view, product_df):
     df_user_view = df_user_view.alias('df_user_view')
     df_user_view = df_user_view.join(product_df, (df_user_view["extra_2"] == product_df["id"]) & (df_user_view["store_id"] == product_df["store_id"]), "left")
 
-    df_final = df_user_view.groupBy(F.window('datetime', '1 hour'), 'name', 'df_user_view.store_id') \
+    # Count the number of views of a product per hour per store
+    df_store = df_user_view.groupBy(F.window('datetime', '1 hour'), 'name', 'df_user_view.store_id') \
         .agg(F.count('content').alias('views'))
     
-    # Window to get the top 10 of each group
-    window = Window.partitionBy('window', 'store_id').orderBy(F.desc("views"))
-
-    # Group the dataframe by window, store_id and views and get the top 10 of each group
-    return df_final.withColumn('rank', F.dense_rank().over(window)) \
-        .filter(F.col('rank') <= 10)
+    # Count the number of views of a product per hour for all stores (store_id = All)
+    df_all = df_user_view.groupBy(F.window('datetime', '1 hour'), 'name') \
+        .agg(F.count('content').alias('views')) \
+        .withColumn('store_id', F.lit('All'))
+    
+    # Group the dataframe by window, store_id and views
+    return df_store.unionByName(df_all)
 
 
 # Get the median of number of views of a product before it was bought
@@ -138,19 +157,24 @@ def median_views_before_buy(df_user_view, df_user_buy):
     df_user_view = df_user_view.groupBy('content', 'extra_2', 'store_id') \
         .agg(F.count('content').alias('views'))
     
-    # Fill the "" values with 0
-    df_user_view = df_user_view.na.fill({'views': 0})
+    # For each product bought, get the number of views before it was bought for each user and fill the null values with 0
+    df_user_buy = df_user_buy.alias('df_user_buy') \
+        .join(df_user_view, ['content', 'extra_2', 'store_id'], 'left') \
+        .na.fill({'views': 0})
     
-    # For each product bought, get the number of views before it was bought for each user
-    df_user_buy = df_user_buy.alias('df_user_buy')
-    df_user_buy = df_user_buy.join(df_user_view, ['content', 'extra_2', 'store_id'], 'left')
-
-    # Save the amount of buys that have the same number of views
-    df_final = df_user_buy.groupBy('views', 'df_user_buy.store_id') \
+    # Save the amount of buys that have the same number of views 
+    df_store = df_user_buy.groupBy('views', 'df_user_buy.store_id') \
         .count() \
         .orderBy('df_user_buy.store_id', 'views')
+    
+    # Save the amount of buys that have the same number of views for all stores (store_id = All)
+    df_all = df_user_buy.groupBy('views') \
+        .count() \
+        .orderBy('views') \
+        .withColumn('store_id', F.lit('All'))
 
-    return df_final
+    return df_store.unionByName(df_all)
+
 
 # Fuction to group the dataframe by a column as "key" and the other columns as "value" in a details column
 def get_df_grouped(df, column_name, columns_list):
@@ -158,6 +182,7 @@ def get_df_grouped(df, column_name, columns_list):
         F.collect_list(F.struct(*columns_list)).alias("details")
     )
     return df_grouped
+
 
 # Function to obtain the last minute of the dataframe for each data in the column and group the column_list in a details column
 def get_df_last_minute(df, window_column, column_name, columns_list):
@@ -167,6 +192,10 @@ def get_df_last_minute(df, window_column, column_name, columns_list):
 
     return get_df_grouped(df, column_name, columns_list)
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> e5ed17e2cc1278756a79316307a69ee9182d596a
 # Function to send the dataframe to the redis as a dictionary
 def send_to_redis_as_dict(redis_client, df, task_name, column_name = 'store_id'):
     for row in df.collect():
@@ -176,7 +205,10 @@ def send_to_redis_as_dict(redis_client, df, task_name, column_name = 'store_id')
             data[i] = {detail_key: detail_value for detail_key, detail_value in detail.asDict().items()}
             if i == 9:
                 break
+<<<<<<< HEAD
 
+=======
+>>>>>>> e5ed17e2cc1278756a79316307a69ee9182d596a
         redis_client.hset(task_name, str(row[column_name]), json.dumps(data))
 
         # Save a copy of the dictionary into a json file (just for DEBUG)
@@ -189,7 +221,7 @@ def send_to_redis_as_dict(redis_client, df, task_name, column_name = 'store_id')
 spark_post = create_spark_session_postgres()
 
 # Read the log files
-log_path = './mock_files/requests/'
+log_path = './mock_files/logs/'
 spark_local = create_spark_session_local()
 df = read_files(spark_local, log_path)
 df.show()

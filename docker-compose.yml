@@ -40,6 +40,7 @@ services:
   spark-historic-app:
     image: spark-historic-app:latest
     build: ./server
+    restart: on-failure
     depends_on:
       - create_tables
       - postgres
@@ -53,7 +54,6 @@ services:
       - REDIS_PORT=6379
     volumes:
       - ./mock/mock_files:/historic_spark/mock_files
-      - ./tasks:/historic_spark/tasks
     command: python historic_data_processor.py
 
   rabbitmq:
@@ -69,24 +69,28 @@ services:
       interval: 10s
       retries: 10
 
-  # producer:
-  #   build:
-  #     context: ./broker/producer
-  #   # restart: on-failure
-  #   depends_on:
-  #     - rabbitmq
-  #   environment:
-  #     RABBITMQ_HOST: rabbitmq
+  producer:
+    build:
+      context: ./broker/producer
+    # restart: on-failure
+    depends_on:
+      - rabbitmq
+    environment:
+      RABBITMQ_HOST: localhost
+    network_mode: "host"
+    restart: on-failure:always
 
-  # consumer:
-  #   build:
-  #     context: ./broker/consumer
-  #   # restart: on-failure
-  #   depends_on:
-  #     - rabbitmq
-  #   environment:
-  #     RABBITMQ_HOST: rabbitmq
-
+  consumer:
+    build:
+      context: ./broker/consumer
+    # restart: on-failure
+    depends_on:
+      - rabbitmq
+    environment:
+      RABBITMQ_HOST: localhost
+    network_mode: "host"
+    restart: on-failure:always
+      
   streamlit:
     build:
       context: ./dashboard

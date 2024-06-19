@@ -4,8 +4,9 @@ import os
 rabbitmq_host = os.getenv('RABBITMQ_HOST', 'localhost')
 
 # Establish connection to RabbitMQ server
-connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+connection = pika.BlockingConnection(pika.ConnectionParameters(rabbitmq_host))
 channel = connection.channel()
+print('Connected to RabbitMQ server')
 
 # Declare the same queue named 'logs'
 channel.queue_declare(queue='logs')

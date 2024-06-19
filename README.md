@@ -27,3 +27,10 @@ To check the database state:
 
 - docker exec -it postgres psql -U myuser mydatabase
 - then run [do not forget schema and the ;] "SELECT * FROM conta_verde.users;"
+
+Instructions to use AWS [Academy]
+
+- Join the AWS Academy Learner Lab
+- Go to modules
+- Init the Learning Lab of AWS Academy
+- When the AWS Status is green, you can click on it and see the services

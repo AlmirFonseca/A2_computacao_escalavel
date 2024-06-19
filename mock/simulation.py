@@ -19,7 +19,7 @@ class SimulationParams:
     max_simultaneus_users: int
     num_new_users_per_cycle: int
     num_new_products_per_cycle: int
-    store_id: int
+    store_id: str
     logs_folder: str
     requests_folder: str
 
@@ -66,12 +66,12 @@ class Simulation:
         config_conta_verde = {}
 
         config_datacat = {
-            "data_path": self.requests_folder_store,
+            "data_path": self.logs_folder_store,
             "log_filename": "log_simulation.txt",
         }
 
         config_cade_analytics = {
-            "data_path": self.logs_folder_store,
+            "data_path": self.requests_folder_store,
             "request_filename": "request_simulation.txt",
             "server_url": "http://localhost:5000"
         }
@@ -110,7 +110,8 @@ class Simulation:
 
     
     def run(self):
-        while True:
+        # while True:
+        for _ in range(5): # Limiting the number of cycles for debugging purposes
             self.cycle += 1
 
             # CONTA VERDE

@@ -16,5 +16,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 # RUN chmod +x start.sh
 
 # Run consumer.py when the container launches
-CMD ["python", "./consumer.py"]
+CMD ["python", "-u", "./consumer.py"]
 # CMD ["./start.sh"]
