@@ -68,6 +68,8 @@ services:
   #   # restart: on-failure
   #   depends_on:
   #     - rabbitmq
+  #   environment:
+  #     RABBITMQ_HOST: rabbitmq
 
   # consumer:
   #   build:
@@ -75,6 +77,8 @@ services:
   #   # restart: on-failure
   #   depends_on:
   #     - rabbitmq
+  #   environment:
+  #     RABBITMQ_HOST: rabbitmq
 
 
 volumes:
