@@ -1,5 +1,7 @@
 import database_secrets
 import psycopg2
+import schedule
+import time
 
 
 def update_prices():
@@ -30,5 +32,14 @@ def update_prices():
         if conn is not None:
             conn.close()
 
-if __name__ == '__main__':
+def job():
     update_prices()
+
+if __name__ == '__main__':
+    # Schedule the job every minute
+    schedule.every().minute.do(job)
+
+    # Keep the script running
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
