@@ -182,5 +182,19 @@ services:
       - ./bonus:/app
     command: python bonus_system.py
 
+  price-updater:
+    build: ./update_price
+    depends_on:
+      - postgres
+    environment:
+      - POSTGREE_CREDENTIALS__DBNAME=mydatabase
+      - POSTGREE_CREDENTIALS__USER=myuser
+      - POSTGREE_CREDENTIALS__PASSWORD=mypassword
+      - POSTGREE_CREDENTIALS__HOST=postgres
+      - POSTGREE_CREDENTIALS__PORT=5432
+    volumes:
+      - ./update_price:/app
+    command: python update_prices.py
+
 volumes:
   postgres_data:

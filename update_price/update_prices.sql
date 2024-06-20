@@ -13,7 +13,7 @@ BEGIN
         SELECT id_product
         FROM conta_verde.products
         ORDER BY random()
-        LIMIT 1
+        LIMIT 1000
     LOOP
         -- Get the current price
         SELECT price INTO current_price FROM conta_verde.products WHERE id_product = product_id;
