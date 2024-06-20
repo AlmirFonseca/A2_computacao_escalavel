@@ -4,18 +4,17 @@ FROM python:3.9-slim
 # Set the working directory in the container
 WORKDIR /events
 
+# Install any needed packages specified in requirements.txt
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
 # Copy the current directory contents into the container at /producer
 COPY webhook.py .
-COPY example_client.py .
-COPY requirements.txt .
-
-# Install any needed packages specified in requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+COPY consumer_example.py .
 
 # chmod
 # COPY start.sh .
 # RUN chmod +x start.sh
 
 # Run producer.py when the container launches
-CMD ["python", "-u", "./webhook.py"]
 # CMD ["./start.sh"]
