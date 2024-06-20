@@ -1,8 +1,7 @@
 # creates a client that sends a message to the server (webhook)
-
 import requests
 
-url = 'http://localhost:5000/log'
+url = 'http://webhook:5000/log'
 data = 'User;login;quelo_logar'
 
 

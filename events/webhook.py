@@ -1,7 +1,6 @@
 from flask import Flask, request, jsonify
-import pika
 import json
-from celery_worker_node import store_user_behavior
+from celery_worker_node import save_event
 
 app = Flask(__name__)
 
@@ -10,10 +9,10 @@ app = Flask(__name__)
 def log():
     log_entry = request.data.decode('utf-8')
     print(f"Received log entry: {log_entry}")
-    response = store_user_behavior.delay(log_entry)
+    response = save_event.delay(log_entry)
     print(response)
-    # result = response.get()
-
+    result = response.get()
+    print(result)
 
     print("RESULT: received", response)
     

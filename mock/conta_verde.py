@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 import psycopg2
 from psycopg2 import sql
 import database_secrets
-import update_prices
 
 # DataCat class is a class that is responsible for managing the data of the application.
 class ContaVerde:
@@ -152,12 +151,5 @@ class ContaVerde:
             cur.close()
 
             print("Products added successfully!")
-        except Exception as e:
-            print("Error:", e)
-
-    def update_prices_in_postgresql(self):
-        try:
-            update_prices.update_prices()
-            print("Prices updated successfully!")
         except Exception as e:
             print("Error:", e)

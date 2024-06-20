@@ -10,12 +10,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the current directory contents into the container at /producer
 COPY webhook.py .
-# COPY consumer_example.py .
 COPY celery_worker_node.py .
-
-# chmod
-# COPY start.sh .
-# RUN chmod +x start.sh
-
-# Run producer.py when the container launches
-# CMD ["./start.sh"]

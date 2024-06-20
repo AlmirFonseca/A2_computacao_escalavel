@@ -11,11 +11,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  redis:
-    image: redis:latest
-    container_name: redis
-    ports:
-      -  "6379:6379"
+  # redis:
+  #   image: redis:latest
+  #   container_name: redis
+  #   ports:
+  #     -  "6379:6379"
 
   create_tables:
     image: create_tables:latest
@@ -41,25 +41,25 @@ services:
     command: python main.py
 
   
-  data-processor-app:
-    image: data_processor:latest
-    build: ./server
-    restart: on-failure
-    depends_on:
-      - create_tables
-      - postgres
-    environment:
-      - DB_NAME=mydatabase
-      - DB_USER=myuser
-      - DB_PASSWORD=mypassword
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-    volumes:
-      - ./mock/mock_files:/processor/mock_files
-      - ./tasks:/processor/tasks
-    command: python data_processor.py
+  # data-processor-app:
+  #   image: data_processor:latest
+  #   build: ./server
+  #   restart: on-failure
+  #   depends_on:
+  #     - create_tables
+  #     - postgres
+  #   environment:
+  #     - DB_NAME=mydatabase
+  #     - DB_USER=myuser
+  #     - DB_PASSWORD=mypassword
+  #     - DB_HOST=postgres
+  #     - DB_PORT=5432
+  #     - REDIS_HOST=redis
+  #     - REDIS_PORT=6379
+  #   volumes:
+  #     - ./mock/mock_files:/processor/mock_files
+  #     - ./tasks:/processor/tasks
+  #   command: python data_processor.py
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -74,77 +74,88 @@ services:
       interval: 10s
       retries: 10
 
-  streamlit:
-    build:
-      context: ./dashboard
-    ports:
-      - "8501:8501"
-    depends_on:
-      - redis
-    volumes:
-      - ./dashboard:/app
-    environment:
-      - REDIS_HOST=redis
+  # streamlit:
+  #   build:
+  #     context: ./dashboard
+  #   ports:
+  #     - "8501:8501"
+  #   depends_on:
+  #     - redis
+  #   volumes:
+  #     - ./dashboard:/app
+  #   environment:
+  #     - REDIS_HOST=redis
 
-  price-monitor:
-    build: ./price_monitor
+  celery-worker:
+    build: ./events
     depends_on:
-      - postgres
+      - rabbitmq
     environment:
-      - DB_NAME=mydatabase
-      - DB_USER=myuser
-      - DB_PASSWORD=mypassword
-      - DB_HOST=postgres
-      - DB_PORT=5432
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
     volumes:
-      - ./price_monitor:/app
-    command: python price_monitor.py
+      - ./events:/events
+    command: celery -A celery_worker_node worker --loglevel=INFO --concurrency=10
+
+  # price-monitor:
+  #   build: ./price_monitor
+  #   depends_on:
+  #     - postgres
+  #   environment:
+  #     - DB_NAME=mydatabase
+  #     - DB_USER=myuser
+  #     - DB_PASSWORD=mypassword
+  #     - DB_HOST=postgres
+  #     - DB_PORT=5432
+  #   volumes:
+  #     - ./price_monitor:/app
+  #   command: python price_monitor.py
 
   webhook:
     image: webhook:latest
     build: ./events
     depends_on:
       - rabbitmq
+      - celery-worker
     environment:
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USER: guest
-      RABBITMQ_PASS: guest
-      RABBITMQ_QUEUE: logs_queue
-    ports:
-      - "5000:5000"
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
     command: python webhook.py
 
-  bonus:
-    build: ./bonus
-    depends_on:
-      - postgres
-      - redis
-    environment:
-      - DB_NAME=mydatabase
-      - DB_USER=myuser
-      - DB_PASSWORD=mypassword
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-    volumes:
-      - ./bonus:/app
-    command: python bonus_system.py
+  # bonus:
+  #   build: ./bonus
+  #   depends_on:
+  #     - postgres
+  #     - redis
+  #   environment:
+  #     - DB_NAME=mydatabase
+  #     - DB_USER=myuser
+  #     - DB_PASSWORD=mypassword
+  #     - DB_HOST=postgres
+  #     - DB_PORT=5432
+  #     - REDIS_HOST=redis
+  #     - REDIS_PORT=6379
+  #   volumes:
+  #     - ./bonus:/app
+  #   command: python bonus_system.py
 
-  price-updater:
-    build: ./update_price
-    depends_on:
-      - postgres
-    environment:
-      - POSTGREE_CREDENTIALS__DBNAME=mydatabase
-      - POSTGREE_CREDENTIALS__USER=myuser
-      - POSTGREE_CREDENTIALS__PASSWORD=mypassword
-      - POSTGREE_CREDENTIALS__HOST=postgres
-      - POSTGREE_CREDENTIALS__PORT=5432
-    volumes:
-      - ./update_price:/app
-    command: python update_prices.py
+  # price-updater:
+  #   build: ./update_price
+  #   depends_on:
+  #     - postgres
+  #   environment:
+  #     - POSTGREE_CREDENTIALS__DBNAME=mydatabase
+  #     - POSTGREE_CREDENTIALS__USER=myuser
+  #     - POSTGREE_CREDENTIALS__PASSWORD=mypassword
+  #     - POSTGREE_CREDENTIALS__HOST=postgres
+  #     - POSTGREE_CREDENTIALS__PORT=5432
+  #   volumes:
+  #     - ./update_price:/app
+  #   command: python update_prices.py
 
 volumes:
   postgres_data:
