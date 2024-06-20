@@ -133,5 +133,22 @@ services:
       - ./price_monitor:/app
     command: python price_monitor.py
 
+  bonus:
+    build: ./bonus
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      - DB_NAME=mydatabase
+      - DB_USER=myuser
+      - DB_PASSWORD=mypassword
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ./bonus:/app
+    command: python bonus_system.py
+
 volumes:
   postgres_data:
