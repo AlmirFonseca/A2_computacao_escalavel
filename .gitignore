@@ -163,3 +163,4 @@ cython_debug/
 
 mock/mock_files/*
 tasks/*
+dashboard/*.json

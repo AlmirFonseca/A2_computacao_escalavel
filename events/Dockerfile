@@ -6,6 +6,7 @@ WORKDIR /events
 
 # Copy the current directory contents into the container at /producer
 COPY webhook.py .
+COPY example_client.py .
 COPY requirements.txt .
 
 # Install any needed packages specified in requirements.txt
