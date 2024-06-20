@@ -119,5 +119,19 @@ services:
       - CELERY_RESULT_BACKEND=rpc://
     command: celery -A mock_celery worker --loglevel=INFO --concurrency=10
 
+  price-monitor:
+    build: ./price_monitor
+    depends_on:
+      - postgres
+    environment:
+      - DB_NAME=mydatabase
+      - DB_USER=myuser
+      - DB_PASSWORD=mypassword
+      - DB_HOST=postgres
+      - DB_PORT=5432
+    volumes:
+      - ./price_monitor:/app
+    command: python price_monitor.py
+
 volumes:
   postgres_data:
