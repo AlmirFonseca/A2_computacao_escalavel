@@ -11,8 +11,6 @@ def log():
     print(f"Received log entry: {log_entry}")
     response = save_event.delay(log_entry)
     print(response)
-    result = response.get()
-    print(result)
 
     print("RESULT: received", response)
     
