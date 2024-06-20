@@ -54,8 +54,7 @@ class Simulation:
         self.G = G
         
         # URL of the server to publish logs to
-        self.SERVER_URL = "http://localhost:5000/log"
-
+        self.SERVER_URL = f"http://{os.environ.get('WEBHOOK_HOST')}:{os.environ.get('WEBHOOK_PORT')}/log"
 
         self.store_folder_name = f"store_{self.params.store_id}"
 
@@ -82,7 +81,7 @@ class Simulation:
         config_cade_analytics = {
             "data_path": self.requests_folder_store,
             "request_filename": "request_simulation.txt",
-            "server_url": "http://localhost:5000"
+            "server_url": f"http://{os.environ.get('WEBHOOK_HOST')}:{os.environ.get('WEBHOOK_PORT')}"
         }
 
           # Replace with your Flask server URL
