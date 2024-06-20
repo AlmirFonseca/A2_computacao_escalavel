@@ -26,7 +26,6 @@ class SimulationParams:
     num_new_products_per_cycle: int
     store_id: str
     logs_folder: str
-    requests_folder: str
 
 class Simulation:
     params: SimulationParams
@@ -59,18 +58,14 @@ class Simulation:
 
         self.store_folder_name = f"store_{self.params.store_id}"
 
-        # create store folder inside requests folder and logs folder
+        # create store folder inside logs folder
         self.logs_folder_name = self.params.logs_folder
-        self.requests_folder_name = self.params.requests_folder
 
-        # create store folder inside requests folder and logs folder
+        # create store folder inside and logs folder
         self.logs_folder_store = f"{self.logs_folder_name}/{self.store_folder_name}"
-        self.requests_folder_store = f"{self.requests_folder_name}/{self.store_folder_name}"
 
         if not os.path.exists(self.logs_folder_store):
             os.makedirs(self.logs_folder_store)
-        if not os.path.exists(self.requests_folder_store):
-            os.makedirs(self.requests_folder_store)
 
         config_conta_verde = {}
 
@@ -80,9 +75,7 @@ class Simulation:
         }
 
         config_cade_analytics = {
-            "data_path": self.requests_folder_store,
-            "request_filename": "request_simulation.txt",
-            "server_url": f"http://{os.environ.get('WEBHOOK_HOST')}:{os.environ.get('WEBHOOK_PORT')}"
+            "server_url": self.SERVER_URL
         }
 
           # Replace with your Flask server URL
@@ -217,20 +210,8 @@ class Simulation:
     def __add_message_to_user_flow_report(self, message):
         cur_time = self.get_timestamp_string()
         msg = cur_time + message
-        self.send_message_to_server(msg)
+        self.CadeAnalytics.send_message_to_server(msg)
         self.user_flow_report.append(msg)
-    
-    def send_message_to_server(self, message):
-        # sends to the server
-        try:
-            print("Sending log to URL!!!!!!!!!!!!!!!!!!!!!!!!!\n\n\n\n")
-            # requests.post(self.SERVER_URL, data=message.encode('utf-8'), timeout=1)
-            # requests.post(f"{self.SERVER_URL}", data=message.encode('utf-8'), timeout=1)
-            requests.post(self.SERVER_URL, data=message.encode('utf-8'))
-
-        except requests.exceptions.RequestException as e:
-            print(f"\nError sending log to URL: {e}\n")
-
 
     def __home(self, user):
         msg = f";{self.params.store_id};User;{user};{STIMUL_SCROLLING};{HOME}.\n"
@@ -315,8 +296,6 @@ class Simulation:
 
         self.DataCat.write_log(self.cycle, self.log_flow)
         self.log_flow = []
-
-        self.CadeAnalytics.write_log(self.cycle, self.user_flow_report)
 
         self.user_flow_report = []
 

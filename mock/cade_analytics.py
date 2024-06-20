@@ -1,24 +1,23 @@
 
 # User Behavior Analytics
-import csv
+
+import requests
+
 class CadeAnalytics:
     def __init__(self, config):
         self.config = config
+        self.SERVER_URL = self.config["server_url"]
         self.cade_analytics_header = ["timestamp", "store_id", "type", "content", "extra_1", "extra_2"]
 
+    def send_message_to_server(self, message):
+        # sends to the server
+        try:
+            print("Sending log to URL!!!!!!!!!!!!!!!!!!!!!!!!!\n\n\n\n")
+            # requests.post(self.SERVER_URL, data=message.encode('utf-8'), timeout=1)
+            # requests.post(f"{self.SERVER_URL}", data=message.encode('utf-8'), timeout=1)
+            requests.post(self.SERVER_URL, data=message.encode('utf-8'))
 
-    
-    def write_log(self, num_cycle, log_flow):
-        if log_flow:
-            # get the correct path for the log file
-            log_cycle = self.config["data_path"] + f"/{num_cycle}"+ self.config["request_filename"]
-            # add the header to the log flow
-            log_flow.insert(0, ";".join(self.cade_analytics_header) + "\n")
-            
-            with open(log_cycle, "a") as f:
-                
-                # acquire lock and write to the file, then release the lock
-                # if self.acquire_lock(log_cycle):
-                # write header
-                f.writelines(log_flow)
-                # self.release_lock(log_cycle)
+        except requests.exceptions.RequestException as e:
+            print(f"\nError sending log to URL: {e}\n")
+
+

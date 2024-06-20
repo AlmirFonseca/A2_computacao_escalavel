@@ -5,7 +5,7 @@ import multiprocessing
 import os
 import uuid
 
-def simulate_store(store_id_unique, logs_folder, requests_folder):
+def simulate_store(store_id_unique, logs_folder):
     print(f"Starting simulation for Store {store_id_unique}...")
     
     params = simulation.SimulationParams(
@@ -18,7 +18,6 @@ def simulate_store(store_id_unique, logs_folder, requests_folder):
         num_new_products_per_cycle=3,
         store_id=store_id_unique,
         logs_folder=logs_folder,
-        requests_folder=requests_folder
     )
 
     sim = simulation.Simulation(params)
@@ -34,26 +33,23 @@ def create_mock_files_folder(folder_name):
     print(f"Folder {folder_name} created successfully.")
     # create the subfolders logs and requests
     os.mkdir(f"{folder_name}/logs")
-    os.mkdir(f"{folder_name}/requests")
-    print("Subfolders logs and requests created successfully.")
-    return f"{folder_name}/logs", f"{folder_name}/requests"
+    print("Subfolders logs created successfully.")
+    return f"{folder_name}/logs"
 
 def main(num_stores: int, local: int):
 
     # Create the main folder for this machine
-    logs_folder, requests_folder = create_mock_files_folder("mock_files")
+    logs_folder = create_mock_files_folder("mock_files")
 
     if local:
         # Run simulations locally using multiprocessing
         pool = multiprocessing.Pool(processes=num_stores)
         logs_folder = [logs_folder] * num_stores
         print(logs_folder)
-        requests_folder = [requests_folder] * num_stores
-        print(requests_folder)
         stores_id = [uuid.uuid4() for _ in range(num_stores)]
         stores_id = [str(i) + "_" + str(store_id) for i, store_id in enumerate(stores_id)]
 
-        pool.starmap(simulate_store, zip(stores_id, logs_folder, requests_folder))
+        pool.starmap(simulate_store, zip(stores_id, logs_folder))
         pool.close()
         pool.join()
     else:
