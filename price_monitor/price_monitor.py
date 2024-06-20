@@ -1,6 +1,15 @@
 import os
-import psycopg2
+import pyspark.sql.functions as F
 from datetime import datetime, timedelta
+from pyspark.sql import SparkSession
+
+
+# Spark session initialization
+spark = SparkSession.builder \
+    .appName("PriceMonitor") \
+    .config("spark.jars", "postgresql-42.7.3.jar") \
+    .getOrCreate()
+
 
 # Database connection settings
 conn_params = {
@@ -11,46 +20,50 @@ conn_params = {
     'port': os.environ.get('DB_PORT')
 }
 
+# Database connection settings
+jdbc_url = f"jdbc:postgresql://{os.environ.get('DB_HOST')}:{os.environ.get('DB_PORT')}/{os.environ.get('DB_NAME')}"
+connection_properties = {
+    "user": os.environ.get('DB_USER'),
+    "password": os.environ.get('DB_PASSWORD'),
+    "driver": "org.postgresql.Driver"
+}
+
+
 def get_price_deals(months, discount_percent):
-    # Establish connection to the database
-    conn = psycopg2.connect(**conn_params)
-    cursor = conn.cursor()
-    
     # Calculate the date range based on the user's input
     end_date = datetime.now()
     start_date = end_date - timedelta(days=30 * months)
     
+    # Load price history data from the database
+    price_history_df = spark.read.jdbc(
+        url=jdbc_url,
+        table="conta_verde.price_history",
+        properties=connection_properties
+    ).filter((F.col("recorded_at") >= start_date) & (F.col("recorded_at") <= end_date))
+    
+    
     # Calculate the average prices of products within the specified period
-    cursor.execute("""
-        SELECT product_id, AVG(price) as average_price 
-        FROM conta_verde.price_history
-        WHERE recorded_at BETWEEN %s AND %s
-        GROUP BY product_id
-    """, (start_date, end_date))
+    avg_prices_df = price_history_df.groupBy("product_id").agg(F.avg("price").alias("average_price"))
     
-    avg_prices = cursor.fetchall()
+    # Load current products data
+    products_df = spark.read.jdbc(
+        url=jdbc_url,
+        table="conta_verde.products",
+        properties=connection_properties
+    )
     
-    deals = []
-    for product_id, avg_price in avg_prices:
-        # Determine the threshold price below which a product is considered a deal
-        threshold_price = avg_price * (1 - discount_percent / 100)
-        
-        # Find products with current prices below the threshold
-        cursor.execute("""
-            SELECT p.id, p.name, p.price 
-            FROM conta_verde.products p
-            WHERE p.id = %s AND p.price < %s
-        """, (product_id, threshold_price))
-        
-        product = cursor.fetchone()
-        if product:
-            deals.append(product)
+    # Determine the threshold prices and find deals
+    threshold_prices_df = avg_prices_df.withColumn("threshold_price", F.col("average_price") * (1 - discount_percent / 100))
     
-    # Close the cursor and the database connection
-    cursor.close()
-    conn.close()
+    deals_df = products_df.join(threshold_prices_df, products_df.id == threshold_prices_df.product_id) \
+                          .filter(products_df.price < threshold_prices_df.threshold_price) \
+                          .select(products_df.id, products_df.name, products_df.price)
+    
+    # Convert the result to a list of tuples
+    deals = [(row.id, row.name, row.price) for row in deals_df.collect()]
     
     return deals
+
 
 if __name__ == "__main__":
     # Prompt the user to enter the parameters
