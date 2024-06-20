@@ -1,14 +1,14 @@
 from celery import Celery
-import psycopg2
-# from psycopg2 import pool
-import json
-import os
 # Run with "celery -A mock_celery worker --loglevel=INFO --concurrency=10"
 
+import redis
+import json
 
+# Redis connection
+# redis_client = redis.StrictRedis(host='redis', port=6379, db=0, decode_responses=True)
 # app = Celery('tasks', broker='pyamqp://guest@localhost//')
 # localhost
-app = Celery('tasks', broker='localhost')
+app = Celery('tasks', broker='localhost', backend='redis')
 
 # with open('config.json') as f:
 #     config = json.load(f)
@@ -41,28 +41,10 @@ def store_user_behavior(message: str):
     Args:
         message (str): The message from the webhook, in JSON format
     """
-    print(message)
-    # message = json.loads(message)
-
-    # # Get a connection from the pool
-    # conn = db_pool.getconn()
-
-    # try:
-    #     # Open a cursor to perform database operations
-    #     cur = conn.cursor()
-
-    #     # Execute a query
-    #     cur.execute(
-    #         "INSERT INTO webhook (shop_id, user_id, product_id, behavior, datetime) VALUES (%s, %s, %s, %s, %s)",
-    #         (message['shop_id'], message['user_id'], message['product_id'], message['behavior'],
-    #          message['datetime'])
-    #     )
-
-    #     # Commit the transaction
-    #     conn.commit()
-
-    # finally:
-    #     # Close the cursor and the connection (returns it to the pool)
-    #     if cur is not None:
-    #         cur.close()
-    #     db_pool.putconn(conn)
+    
+    # creates a file
+    with open('message.txt', 'w') as f:
+        f.write(message)
+    print(message, "Hello!!")
+    # messagee = json.loads(message)
+    return message

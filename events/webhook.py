@@ -10,7 +10,15 @@ app = Flask(__name__)
 def log():
     log_entry = request.data.decode('utf-8')
     print(f"Received log entry: {log_entry}")
-    store_user_behavior.delay(log_entry)
+    response = store_user_behavior.delay(log_entry)
+    print(response)
+    # result = response.get()
+
+
+    print("RESULT: received", response)
+    
+    # try to decode the result
+    
     return jsonify({"status": "received"}), 200
 
 @app.route('/')
