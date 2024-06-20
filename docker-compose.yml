@@ -74,28 +74,6 @@ services:
       interval: 10s
       retries: 10
 
-  producer:
-    build:
-      context: ./broker/producer
-    # restart: on-failure
-    depends_on:
-      - rabbitmq
-    environment:
-      RABBITMQ_HOST: localhost
-    network_mode: "host"
-    restart: on-failure:always
-
-  consumer:
-    build:
-      context: ./broker/consumer
-    # restart: on-failure
-    depends_on:
-      - rabbitmq
-    environment:
-      RABBITMQ_HOST: localhost
-    network_mode: "host"
-    restart: on-failure:always
-      
   streamlit:
     build:
       context: ./dashboard
@@ -151,19 +129,6 @@ services:
     ports:
       - "5000:5000"
     command: python webhook.py
-
-  consumer_example:
-    image: consumer_example:latest
-    build: ./events
-    depends_on:
-      - webhook
-    environment:
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USER: guest
-      RABBITMQ_PASS: guest
-      RABBITMQ_QUEUE: logs_queue
-    command: python consumer_example.py
 
   bonus:
     build: ./bonus
