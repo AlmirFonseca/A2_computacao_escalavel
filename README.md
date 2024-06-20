@@ -34,3 +34,7 @@ Instructions to use AWS [Academy]
 - Go to modules
 - Init the Learning Lab of AWS Academy
 - When the AWS Status is green, you can click on it and see the services
+
+Celery:
+
+- celery -A mock_celery worker --loglevel=INFO --concurrency=10
