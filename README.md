@@ -10,18 +10,13 @@ Install the Docker and its images:
 - Kafka (Broker): https://hub.docker.com/r/apache/kafka
 - PostgreeSQL: https://hub.docker.com/_/postgres
 
-Install PySpark:
+To run the docker:
 
-- https://spark.apache.org/docs/latest/api/python/getting_started/install.html
-
-Install other dependencies:
-
-pip install -r requirements.txt
-
-To run the mock:
-
-- DOCKER COMPOSE BUILD
 - docker-compose up --build
+
+To view the streamlit app:
+
+- http://localhost:8501/
 
 To check the database state:
 
@@ -35,6 +30,3 @@ Instructions to use AWS [Academy]
 - Init the Learning Lab of AWS Academy
 - When the AWS Status is green, you can click on it and see the services
 
-Celery:
-
-- celery -A mock_celery worker --loglevel=INFO --concurrency=10
