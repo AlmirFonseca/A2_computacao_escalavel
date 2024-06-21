@@ -7,10 +7,12 @@ app = Flask(__name__)
 
 @app.route('/log', methods=['POST'])
 def log():
+    #
     log_entry = request.data.decode('utf-8')
     print(f"Received log entry: {log_entry}")
     response = save_event.delay(log_entry)
     print(response)
+    
 
     print("RESULT: received", response)
     
@@ -23,4 +25,6 @@ def index():
     return "Flask server running!"
 
 if __name__ == "__main__":
+    # add the process_queue task to the celery queue
+    
     app.run(host='0.0.0.0', port=5000, debug=True, threaded=True)

@@ -101,6 +101,18 @@ services:
       - ./events:/events
     command: celery -A celery_worker_node worker --loglevel=INFO --concurrency=10
 
+  queue-consumer:
+    build: ./events
+    depends_on:
+      - redis
+      - celery-worker
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ./events:/events
+    command: python queue_consumer.py
+
   # price-monitor:
   #   build: ./price_monitor
   #   depends_on:
