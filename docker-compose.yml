@@ -105,10 +105,15 @@ services:
     build: ./events
     depends_on:
       - redis
+      - postgres
       - celery-worker
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - DB_NAME=mydatabase
+      - DB_USER=myuser
+      - DB_PASSWORD=mypassword
+      - DB_HOST=postgres
     volumes:
       - ./events:/events
     command: python queue_consumer.py
