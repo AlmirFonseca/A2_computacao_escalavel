@@ -3,3 +3,4 @@ requests
 celery
 redis
 psycopg2
+redis_collections

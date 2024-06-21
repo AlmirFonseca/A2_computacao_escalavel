@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
+from bonus_system import save_event_message
 import json
-from celery_worker_node import save_event
 
 app = Flask(__name__)
 
@@ -10,7 +10,7 @@ def log():
     #
     log_entry = request.data.decode('utf-8')
     print(f"Received log entry: {log_entry}")
-    response = save_event.delay(log_entry)
+    response = save_event_message.delay(log_entry)
     print(response)
     
 
@@ -25,6 +25,5 @@ def index():
     return "Flask server running!"
 
 if __name__ == "__main__":
-    # add the process_queue task to the celery queue
-    
+    # add th
     app.run(host='0.0.0.0', port=5000, debug=True, threaded=True)

@@ -86,9 +86,11 @@ services:
   #   environment:
   #     - REDIS_HOST=redis
 
-  celery-worker:
+
+  bonus-system-worker:
     build: ./events
     depends_on:
+      - redis
       - rabbitmq
     environment:
       - RABBITMQ_USER=guest
@@ -97,16 +99,20 @@ services:
       - RABBITMQ_PORT=5672
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - DB_NAME=mydatabase
+      - DB_USER=myuser
+      - DB_PASSWORD=mypassword
+      - DB_HOST=postgres
     volumes:
       - ./events:/events
-    command: celery -A celery_worker_node worker --loglevel=INFO --concurrency=10
+    command: celery -A bonus_system worker --loglevel=INFO --concurrency=10
 
   queue-consumer:
     build: ./events
     depends_on:
       - redis
       - postgres
-      - celery-worker
+      - rabbitmq
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -114,6 +120,10 @@ services:
       - DB_USER=myuser
       - DB_PASSWORD=mypassword
       - DB_HOST=postgres
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
     volumes:
       - ./events:/events
     command: python queue_consumer.py
@@ -137,30 +147,12 @@ services:
     build: ./events
     depends_on:
       - rabbitmq
-      - celery-worker
     environment:
       - RABBITMQ_USER=guest
       - RABBITMQ_PASS=guest
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
     command: python webhook.py
-
-  # bonus:
-  #   build: ./bonus
-  #   depends_on:
-  #     - postgres
-  #     - redis
-  #   environment:
-  #     - DB_NAME=mydatabase
-  #     - DB_USER=myuser
-  #     - DB_PASSWORD=mypassword
-  #     - DB_HOST=postgres
-  #     - DB_PORT=5432
-  #     - REDIS_HOST=redis
-  #     - REDIS_PORT=6379
-  #   volumes:
-  #     - ./bonus:/app
-  #   command: python bonus_system.py
 
   # price-updater:
   #   build: ./update_price
