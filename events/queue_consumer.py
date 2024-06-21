@@ -55,14 +55,17 @@ def send_to_bonus_system(list_events):
 
 # Function to dequeue an item
 def dequeue_all_itens(conn):
-    itens = []
-    while True:
-        item = redis_client.lpop('events')
-        if item is None:
-            break
-        else:
-            print(f"Dequeued item: {item.decode('utf-8')}")
-        itens.append(item.decode('utf-8'))
+    # itens = []
+    # while True:
+    #     item = redis_client.lpop('events')
+    #     if item is None:
+    #         break
+    #     else:
+    #         print(f"Dequeued item: {item.decode('utf-8')}")
+    #     itens.append(item.decode('utf-8'))
+
+    itens = redis_client.lrange('events', 0, -1)
+    redis_client.delete('events')
         
     if itens is not None:
 
@@ -75,6 +78,8 @@ def dequeue_all_itens(conn):
         print(f"Dequeued {len(itens)} itens")
     else:
         print("No itens to dequeue")
+    
+
 
 
 
