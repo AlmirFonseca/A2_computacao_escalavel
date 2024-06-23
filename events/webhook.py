@@ -11,6 +11,7 @@ def log():
     log_entry = request.data.decode('utf-8')
     print(f"Received log entry: {log_entry}")
     response = save_event_message.delay(log_entry)
+    # other_response = process_bonification(log_entry)
     print(response)
     
 

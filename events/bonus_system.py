@@ -41,7 +41,7 @@ purchases = []
 
 redis_client = redis.StrictRedis(host=REDIS_HOST, port=REDIS_PORT, db=0)
 # remove the cache 
-redis_client.delete('product_prices')
+# redis_client.delete('product_prices')
 
 def get_db_connection():
     return psycopg2.connect(
@@ -100,30 +100,29 @@ def receive_batch_events(events_list_id):
 def process_data_list(item):
     
     timestamp, store, type, id_user, action, details = item.split(';')
-    # 1718980432757523471;0_76a0fe63-bc98-4cb9-a329-fa98cf08b595;User;111329727563;CLICK;CHECKOUT with ['2525660180', '2301981682'].
-    # Continue the processing if the action starts with CHECKOUT
-    if not details.startswith('CHECKOUT'):
-        return {"status": "no checkout action"}
+    # Continue the processing if the action starts with BUY
+    # 1719127301109864497;0_dc5578e4-e904-44d9-8de9-7264ccdb4b18;User;142688210535;CLICK;BUY-2070149575-447.
+    if not details.startswith('BUY'):
+        return {"status": "no BUY action"}
+    
+    parts = details.split('-')
 
-    product_prices = fetch_product_prices()
-    
-    # Extract the products IDs from the details
-    products = details.split('[')[1].split(']')[0].split(', ')
-    products = [product.replace("'", "") for product in products]
-    
-    amount = sum(product_prices.get(product_id, 0.0) for product_id in products)
-    
-    # Example processing logic:
+    # extrract product id and price
+    product_id, product_price = parts[0], parts[1]
+
     processed_item = {
         'timestamp': datetime.fromtimestamp(int(timestamp) / 1e9),  # Assuming microseconds
         'store_id': store,
         'user_id': id_user,
-        'products': products,
-        'amount': amount
+        'product': product_id,
+        'amount': float(product_price)
     }
+    # print("\ntype of processed itm timestamp", type(processed_item['timestamp']))
+    
         
     print(f"\nitem: {processed_item}\n")
     return save_event(processed_item)
+    
 
 @app.task
 def save_event(message):
@@ -144,11 +143,18 @@ def save_event(message):
 def check_criteria(user_id):
     global purchases
     now = datetime.now()
-    
+
     # Calculate total amount spent in the last 10 minutes
-    total_10_minutes = sum(purchase['amount'] for purchase in purchases if purchase['user_id'] == user_id and purchase['timestamp'] > now - timedelta(minutes=10))
+    # total_10_minutes = sum(purchase['amount'] for purchase in purchases if purchase['user_id'] == user_id and purchase['timestamp'] > now - timedelta(seconds=10))
+    total_10_minutes = 0
+    for purchase in purchases:
+        if purchase['user_id'] == user_id and purchase['timestamp'] > now - timedelta(seconds=10):
+            total_10_minutes += purchase['amount']
+
+    if total_10_minutes > X:
+        print(f"Total amount spent in the last 10 minutes: {total_10_minutes}")
     # Calculate total amount spent in the last 6 hours
-    total_6_hours = sum(purchase['amount'] for purchase in purchases if purchase['user_id'] == user_id and purchase['timestamp'] > now - timedelta(hours=6))
+    total_6_hours = sum(purchase['amount'] for purchase in purchases if purchase['user_id'] == user_id and purchase['timestamp'] > now - timedelta(minutes=6))
     
     return total_10_minutes > X and total_6_hours > Y
 

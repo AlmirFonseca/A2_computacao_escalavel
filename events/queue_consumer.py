@@ -46,14 +46,14 @@ db_conn_params = {
     
 #     return processed_data
 
-def send_to_bonus_system(list_events):
-    print("=====================================")
-    # send the list of events to the redis queue
-    for event in list_events:
-        redis_client.rpush('events_bonus', event)
-        print(f"Event sent to bonus system: {event}")
+# def send_to_bonus_system(list_events):
+#     print("=====================================")
+#     # send the list of events to the redis queue
+#     for event in list_events:
+#         redis_client.rpush('events_bonus', event)
+#         print(f"Event sent to bonus system: {event}")
 
-    receive_batch_events.delay('events_bonus')
+#     receive_batch_events.delay('events_bonus')
 
 # Function to dequeue an item
 def dequeue_all_itens(conn):
@@ -71,7 +71,7 @@ def dequeue_all_itens(conn):
         
     if itens is not None:
 
-        send_to_bonus_system(itens)
+        # send_to_bonus_system(itens)
 
         # execute many
         cursor.executemany("INSERT INTO events (message) VALUES (%s)", [(item,) for item in itens])
@@ -81,9 +81,6 @@ def dequeue_all_itens(conn):
     else:
         print("No itens to dequeue")
     
-
-
-
 
 if __name__ == "__main__":
     # create tables events
