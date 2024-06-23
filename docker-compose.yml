@@ -59,7 +59,6 @@ services:
     volumes:
       - ./mock/mock_files:/processor/mock_files
       - ./tasks:/processor/tasks
-      # - ./server:/app
     command: python data_processor.py
 
   rabbitmq:
@@ -88,7 +87,6 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
 
-
   bonus-system-worker:
     build: ./events
     depends_on:
@@ -105,6 +103,7 @@ services:
       - DB_USER=myuser
       - DB_PASSWORD=mypassword
       - DB_HOST=postgres
+      - DB_PORT=5432
     volumes:
       - ./events:/events
     command: celery -A bonus_system worker --loglevel=INFO --concurrency=10
@@ -115,6 +114,7 @@ services:
       - redis
       - postgres
       - rabbitmq
+    restart: on-failure
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -130,19 +130,19 @@ services:
       - ./events:/events
     command: python queue_consumer.py
 
-  # price-monitor:
-  #   build: ./price_monitor
-  #   depends_on:
-  #     - postgres
-  #   environment:
-  #     - DB_NAME=mydatabase
-  #     - DB_USER=myuser
-  #     - DB_PASSWORD=mypassword
-  #     - DB_HOST=postgres
-  #     - DB_PORT=5432
-  #   volumes:
-  #     - ./price_monitor:/app
-  #   command: python price_monitor.py
+  price-monitor:
+    build: ./price_monitor
+    depends_on:
+      - postgres
+    environment:
+      - DB_NAME=mydatabase
+      - DB_USER=myuser
+      - DB_PASSWORD=mypassword
+      - DB_HOST=postgres
+      - DB_PORT=5432
+    volumes:
+      - ./price_monitor:/app
+    command: python price_monitor.py
 
   webhook:
     image: webhook:latest
@@ -156,19 +156,19 @@ services:
       - RABBITMQ_PORT=5672
     command: python webhook.py
 
-  # price-updater:
-  #   build: ./update_price
-  #   depends_on:
-  #     - postgres
-  #   environment:
-  #     - POSTGREE_CREDENTIALS__DBNAME=mydatabase
-  #     - POSTGREE_CREDENTIALS__USER=myuser
-  #     - POSTGREE_CREDENTIALS__PASSWORD=mypassword
-  #     - POSTGREE_CREDENTIALS__HOST=postgres
-  #     - POSTGREE_CREDENTIALS__PORT=5432
-  #   volumes:
-  #     - ./update_price:/app
-  #   command: python update_prices.py
+  price-updater:
+    build: ./update_price
+    depends_on:
+      - postgres
+    environment:
+      - POSTGREE_CREDENTIALS__DBNAME=mydatabase
+      - POSTGREE_CREDENTIALS__USER=myuser
+      - POSTGREE_CREDENTIALS__PASSWORD=mypassword
+      - POSTGREE_CREDENTIALS__HOST=postgres
+      - POSTGREE_CREDENTIALS__PORT=5432
+    volumes:
+      - ./update_price:/app
+    command: python update_prices.py
 
 volumes:
   postgres_data:

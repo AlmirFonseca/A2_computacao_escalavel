@@ -3,7 +3,8 @@ from datetime import datetime, timedelta
 import json
 import os
 import redis
-
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 # Get environment variables of rabbitmq broker
 RABBITMQ_USER = os.environ.get('RABBITMQ_USER')
@@ -13,6 +14,20 @@ RABBITMQ_PORT = os.environ.get('RABBITMQ_PORT')
 REDIS_HOST = os.environ.get('REDIS_HOST')
 REDIS_PORT = os.environ.get('REDIS_PORT')
 
+# postgres
+DB_NAME = os.environ.get('DB_NAME')
+DB_USER = os.environ.get('DB_USER')
+DB_PASSWORD = os.environ.get('DB_PASSWORD')
+DB_HOST = os.environ.get('DB_HOST')
+DB_PORT = os.environ.get('DB_PORT')
+
+db_conn_params = {
+    'dbname': DB_NAME,
+    'user': DB_USER,
+    'password': DB_PASSWORD,
+    'host': DB_HOST,
+    'port': DB_PORT
+}
 
 app = Celery('tasks', 
              broker=f'amqp://{RABBITMQ_USER}:{RABBITMQ_PASS}@{RABBITMQ_HOST}:{RABBITMQ_PORT}//', broker_connection_retry_on_startup=True)
@@ -24,56 +39,90 @@ Y = 500.00  # Minimum billing value in the last 6 hours
 # In-memory database simulation to record purchases
 purchases = []
 
-redis = redis.StrictRedis(host=os.environ.get('REDIS_HOST'), port=os.environ.get('REDIS_PORT'), db=0)
+redis_client = redis.StrictRedis(host=REDIS_HOST, port=REDIS_PORT, db=0)
+# remove the cache 
+redis_client.delete('product_prices')
+
+def get_db_connection():
+    return psycopg2.connect(
+        dbname=DB_NAME,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        host=DB_HOST,
+        port=DB_PORT
+    )
+
+def fetch_product_prices():
+    # Try to get product prices from Redis cache
+    cached_product_prices = redis_client.get('product_prices')
+    if cached_product_prices:
+        # Convert the cached data from JSON to a dictionary
+        product_prices = json.loads(cached_product_prices)
+    else:
+        print(f"\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\n Fetching product prices from database!!!")
+        # Fetch from database if not in cache
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cursor.execute("SELECT id, price FROM conta_verde.products")
+        products = cursor.fetchall()
+        
+        cursor.close()
+        conn.close()
+        
+        # Convert the result to a dictionary
+        product_prices = {product['id']: int(product['price']) for product in products}
+        
+        # Cache the product prices in Redis with a TTL of 10 seconds
+        redis_client.setex('product_prices', timedelta(seconds=10), json.dumps(product_prices))
+    
+    return product_prices
 
 @app.task
 def save_event_message(message: str):
     # Save the message in redis, append the message to the list
-    redis.rpush('events', message)
-    print(f"Message saved: {message}")
+    redis_client.rpush('events', message)
+    process_data_list(message)
+    return {"status": "event saved"}
 
 @app.task
 def receive_batch_events(events_list_id):
-    print("here")
-    # for message in messages:
-    #     save_event(message)
-    # print(f"Received batch of {events} events")
-    # get the events from the redis
-    # events = app.backend.get(events_list_id)
-    events = redis.lrange('events_bonus', 0, -1)
-    print("ok")
-    # process the events in parallel
-    redis.delete(events_list_id)
-
-    # NAO ESTA ENTRANDO AQUI, PARCE QUE A LISTA DEE EVENTOS TA VAZIA
+    events = redis_client.lrange('events_bonus', 0, -1)
+    redis_client.delete(events_list_id)
 
     for event in events:
         print(f"Event: {event}")
         process_data_list(event)
-    # apply the result of the group to the save_event
-    # chord(group_process_data_list, save_event.s()).delay()
-
     
-    # print(f"Received batch of {events} events")
     return {"status": "events processed"}
 
-# organize the vnts as jsjon
-# @app.task
+@app.task
 def process_data_list(item):
+    
+    timestamp, store, type, id_user, action, details = item.split(';')
+    # 1718980432757523471;0_76a0fe63-bc98-4cb9-a329-fa98cf08b595;User;111329727563;CLICK;CHECKOUT with ['2525660180', '2301981682'].
+    # Continue the processing if the action starts with CHECKOUT
+    if not details.startswith('CHECKOUT'):
+        return {"status": "no checkout action"}
 
-    timestamp, store, user, id_user_store, action, details = item.split(';')
-    # 1718969722922310367;0_96f73bce-5719-480b-b0ab-20a77d9219be;User;168011577341;SCROLLING;HOME.
+    product_prices = fetch_product_prices()
+    
+    # Extract the products IDs from the details
+    products = details.split('[')[1].split(']')[0].split(', ')
+    products = [product.replace("'", "") for product in products]
+    
+    amount = sum(product_prices.get(product_id, 0.0) for product_id in products)
+    
     # Example processing logic:
     processed_item = {
-        'timestamp': timestamp,
-        'store': store,
-        'user': user,
-        'id': id_user_store,
-        'action': action,
-        'details': details.strip()  # Remove trailing newline characters
+        'timestamp': datetime.fromtimestamp(int(timestamp) / 1e9),  # Assuming microseconds
+        'store_id': store,
+        'user_id': id_user,
+        'products': products,
+        'amount': amount
     }
         
-    print(f"\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\n   item: {processed_item}\n\n")
+    print(f"\nitem: {processed_item}\n")
     return save_event(processed_item)
 
 @app.task
@@ -81,15 +130,16 @@ def save_event(message):
     global purchases
     purchases.append(message)
     print(f"Purchase recorded: {message}")
-    user_id = message['id']
+    user_id = message['user_id']
     print(f"User ID: {user_id}")
     
-    # if check_criteria(user_id):
-    #     coupon = generate_coupon(user_id)
-    #     notify_ecommerce(user_id, coupon)
-    #     return {"status": "coupon generated", "coupon": coupon}
-    # else:
-    #     return {"status": "no coupon"}
+    if check_criteria(user_id):
+        coupon = generate_coupon(user_id)
+        notify_ecommerce(user_id, coupon)
+        return {"status": "coupon generated", "coupon": coupon}
+    else:
+        print("No coupon generated")
+        return {"status": "no coupon"}
 
 def check_criteria(user_id):
     global purchases

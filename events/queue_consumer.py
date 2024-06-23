@@ -16,12 +16,14 @@ DB_NAME = os.environ.get('DB_NAME')
 DB_USER = os.environ.get('DB_USER')
 DB_PASSWORD = os.environ.get('DB_PASSWORD')
 DB_HOST = os.environ.get('DB_HOST')
+DB_PORT = os.environ.get('DB_PORT')
 
 db_conn_params = {
     'dbname': DB_NAME,
     'user': DB_USER,
     'password': DB_PASSWORD,
-    'host': DB_HOST
+    'host': DB_HOST,
+    'port': DB_PORT
 }
 
 # def process_data_list(data_list):
@@ -104,7 +106,7 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"Error: {e}")
             exit(1)
-        
+
 
         dequeue_all_itens(conn)
         conn.close()
