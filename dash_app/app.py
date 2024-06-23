@@ -161,6 +161,8 @@ def update_output(n, selected_store):
             parsed_output += parse_most_viewed_products(data)
         elif task == 'median_views_before_buy':
             parsed_output += parse_median_views_before_buying(data)
+        elif task == 'without_stock':
+            parsed_output += parse_without_stock(data)
     
     return parsed_output
 
@@ -202,18 +204,28 @@ def parse_revenue(data):
 def parse_unique_users(data):
     if not data:
         return "No data available.\n"
+    
     result = f"\n\nUnique Users (from {data.get('0').get('window_start', 'N/A')} to {data.get('0').get('window_end', 'N/A')}):\n"
     for rank, product in enumerate(data.values()):
         result += f"#{rank+1}: Product {product.get('name', 'N/A')}: {product.get('unique_users', 'N/A')} unique users\n"
+
     return result
 
 def parse_most_viewed_products(data):
     if not data:
         return "No data available.\n"
+    
     result = f"\n\nMost Viewed Products (from {data.get('0').get('window_start', 'N/A')} to {data.get('0').get('window_end', 'N/A')}):\n"
     for rank, product in enumerate(data.values()):
         result += f"#{rank+1}: Product {product.get('name', 'N/A')}: {product.get('views', 'N/A')} views\n"
+
     return result
+
+def parse_without_stock(data):
+    if not data:
+        return "No data available.\n"
+
+    return f"\n\nProducts Sold Without Stock: {data.get('0').get('products_sold_without_stock', 'N/A')} units\n"
 
 def parse_median_views_before_buying(data):
     if not data:
