@@ -146,8 +146,10 @@ services:
 
   price-monitor:
     build: ./price_monitor
+    container_name: price_monitor
     depends_on:
       - postgres
+      - redis
     environment:
       - DB_NAME=mydatabase
       - DB_USER=myuser
@@ -157,6 +159,14 @@ services:
     volumes:
       - ./price_monitor:/app
     command: python price_monitor.py
+
+  # price_monitor_mock:
+  #   build: ./price_monitor_mock
+  #   container_name: price_monitor_mock
+  #   depends_on:
+  #     - redis
+  #   volumes:
+  #     - ./price_monitor_mock:/app
 
   webhook:
     image: webhook:latest

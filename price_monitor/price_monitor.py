@@ -1,15 +1,12 @@
 import os
-import pyspark.sql.functions as F
+import psycopg2
+import json
+import redis
 from datetime import datetime, timedelta
-from pyspark.sql import SparkSession
+import time
 
-
-# Spark session initialization
-spark = SparkSession.builder \
-    .appName("PriceMonitor") \
-    .config("spark.jars", "postgresql-42.7.3.jar") \
-    .getOrCreate()
-
+# Configure Redis connection
+redis_client = redis.StrictRedis(host='redis', port=6379, db=0, decode_responses=True)
 
 # Database connection settings
 conn_params = {
@@ -20,62 +17,62 @@ conn_params = {
     'port': os.environ.get('DB_PORT')
 }
 
-# Database connection settings
-jdbc_url = f"jdbc:postgresql://{os.environ.get('DB_HOST')}:{os.environ.get('DB_PORT')}/{os.environ.get('DB_NAME')}"
-connection_properties = {
-    "user": os.environ.get('DB_USER'),
-    "password": os.environ.get('DB_PASSWORD'),
-    "driver": "org.postgresql.Driver"
-}
-
-
 def get_price_deals(months, discount_percent):
-    # Calculate the date range based on the user's input
+    conn = psycopg2.connect(**conn_params)
+    cursor = conn.cursor()
     end_date = datetime.now()
     start_date = end_date - timedelta(days=30 * months)
     
-    # Load price history data from the database
-    price_history_df = spark.read.jdbc(
-        url=jdbc_url,
-        table="conta_verde.price_history",
-        properties=connection_properties
-    ).filter((F.col("recorded_at") >= start_date) & (F.col("recorded_at") <= end_date))
+    cursor.execute("""
+        SELECT product_id, AVG(price) as average_price
+        FROM conta_verde.price_history
+        WHERE recorded_at BETWEEN %s AND %s
+        GROUP BY product_id
+    """, (start_date, end_date))
     
+    avg_prices = cursor.fetchall()
+    deals = []
+    for product_id, avg_price in avg_prices:
+        threshold_price = avg_price * (1 - discount_percent / 100)
+        cursor.execute("""
+            SELECT p.id, p.name, p.price
+            FROM conta_verde.products p
+            WHERE p.id = %s AND p.price < %s
+        """, (product_id, threshold_price))
+        
+        product = cursor.fetchone()
+        if product:
+            deals.append(product)
     
-    # Calculate the average prices of products within the specified period
-    avg_prices_df = price_history_df.groupBy("product_id").agg(F.avg("price").alias("average_price"))
-    
-    # Load current products data
-    products_df = spark.read.jdbc(
-        url=jdbc_url,
-        table="conta_verde.products",
-        properties=connection_properties
-    )
-    
-    # Determine the threshold prices and find deals
-    threshold_prices_df = avg_prices_df.withColumn("threshold_price", F.col("average_price") * (1 - discount_percent / 100))
-    
-    deals_df = products_df.join(threshold_prices_df, products_df.id == threshold_prices_df.product_id) \
-                          .filter(products_df.price < threshold_prices_df.threshold_price) \
-                          .select(products_df.id, products_df.name, products_df.price)
-    
-    # Convert the result to a list of tuples
-    deals = [(row.id, row.name, row.price) for row in deals_df.collect()]
-    
+    cursor.close()
+    conn.close()
     return deals
 
+def handle_message(message):
+    try:
+        print(" -> Received message:", message)
+        data = message['data']
+        if data:
+            job_data = json.loads(data)
+            deals = get_price_deals(job_data['time_window'], job_data['discount_percentage'])
+            result = {
+                'status': 'success',
+                'task_name': "price_monitor_job_results",
+                'deals': [{'id': deal[0], 'name': deal[1], 'price': deal[2]} for deal in deals],
+                'timestamp': datetime.now().isoformat()
+            }
+            redis_client.publish('price_monitor_job_results', json.dumps(result))
+            print(" <- Published results:", result)
+    except Exception as e:
+        print(f"Error processing the message: {e}")
 
-if __name__ == "__main__":
-    # Prompt the user to enter the parameters
-    months = int(input("Enter the number of months to consider: "))
-    discount_percent = float(input("Enter the desired discount percentage: "))
-    
-    # Find products with significant discounts
-    deals = get_price_deals(months, discount_percent)
-    
-    if deals:
-        print(f"Products with prices significantly below average over the last {months} months:")
-        for deal in deals:
-            print(f"ID: {deal[0]}, Name: {deal[1]}, Current Price: R${deal[2]:.2f}")
-    else:
-        print("No products found matching the specified criteria.")
+def subscribe_to_channel():
+    pubsub = redis_client.pubsub()
+    pubsub.subscribe(**{'price_monitor_channel': handle_message})
+    pubsub.run_in_thread(sleep_time=0.01)
+
+if __name__ == '__main__':
+    subscribe_to_channel()
+    print("Real Price Monitor Service Running...")
+    while True:
+        pass

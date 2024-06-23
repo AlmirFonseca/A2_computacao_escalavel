@@ -4,6 +4,7 @@ from dash.dependencies import Output, Input
 import json
 import redis
 import threading
+import time
 
 DEBUG = False
 
@@ -17,6 +18,7 @@ redis_client = redis.StrictRedis(host='redis', port=6379, db=0, decode_responses
 # Global variable to store messages
 messages = {}
 latest_message = {}
+latest_result = None
 
 # Function to handle incoming messages
 def handle_message(message):
@@ -39,10 +41,29 @@ def handle_message(message):
         print(f"Error decoding message: {e}")
 
 # Function to subscribe to Redis channels
-def subscribe_to_redis():
+def subscribe_to_insights():
     pubsub = redis_client.pubsub()
     pubsub.subscribe(**{"ecommerce_data": handle_message})
     pubsub.run_in_thread(sleep_time=0.001)
+    
+# Subscribe to Redis channel for price monitor results
+def subscribe_to_price_monitor_results():
+    pubsub = redis_client.pubsub()
+    pubsub.subscribe(**{'price_monitor_job_results': handle_price_monitor_result_message})
+    thread = pubsub.run_in_thread(sleep_time=0.001)
+    return thread
+
+# Handle incoming results
+def handle_price_monitor_result_message(message):
+    global latest_result
+    data = message['data']
+    if data:
+        try:
+            latest_result = json.loads(data)
+            print("Received result:", latest_result)
+
+        except json.JSONDecodeError:
+            print("Error decoding the result message.")
 
 def load_store_ids():
     return sorted(messages.keys())
@@ -62,8 +83,45 @@ app.layout = html.Div([
         id='interval-component',
         interval=1*1000,  # in milliseconds
         n_intervals=0
-    )
+    ),
+    html.H2("Price Monitor"),
+    html.H4("Select the number of months:"),
+    dcc.Slider(
+        id='months-slider',
+        min=1,
+        max=48,
+        step=1,
+        marks=None,
+        value=12,
+        tooltip={'placement': 'bottom', 'always_visible': True, 'template': '{value} months'}
+    ),
+    html.H4("Select the desired discount percentage:"),
+    dcc.Slider(
+        id='discount-slider',
+        min=0,
+        max=100,
+        step=0.1,
+        marks=None,
+        value=10,
+        tooltip={'placement': 'bottom', 'always_visible': True, 'template': '{value}% discount'}),
+    html.Button('Ask for offers', id='submit-button', n_clicks=0),
+    html.Div(id='container-button-basic'),
+    dcc.Interval(
+        id='update-interval',
+        interval=1000,  # Update every 1 second
+        n_intervals=0
+    ),
+    html.Div(id='result-output')
 ])
+
+@app.callback(
+    Output('result-output', 'children'),
+    [Input('update-interval', 'n_intervals')]
+)
+def update_output_div(n):
+    if latest_result:
+        return f'Result: {json.dumps(latest_result)}'
+    return 'No new results yet.'
 
 # Callback to update the dropdown options dynamically
 @app.callback(
@@ -105,6 +163,26 @@ def update_output(n, selected_store):
             parsed_output += parse_median_views_before_buying(data)
     
     return parsed_output
+
+@app.callback(
+    [Output('container-button-basic', 'children'),
+     Output('submit-button', 'n_clicks')],
+    [Input('submit-button', 'n_clicks')],
+    [Input('months-slider', 'value'),
+     Input('discount-slider', 'value')]
+)
+def update_output(n_clicks, months, discount):
+    if n_clicks > 0 and discount > 0:
+        message = {
+            'task_name': 'price_monitor_job',
+            'time_window': months,
+            'discount_percentage': discount
+        }
+        redis_client.publish('price_monitor_channel', json.dumps(message))
+        print(f"Sent PRICE_MONITOR message: {json.dumps(message, indent=2)}")
+
+        return f'Offer request sent asking for products with a discount of {discount}% in the past {months} months (at {time.ctime()}).\n', 0
+    return 'Set discount greater than 0% to enable offer request and click the button to request offers.\n', n_clicks
 
 # Parsing functions
 def parse_purchases(data):
@@ -168,7 +246,8 @@ def parse_median_views_before_buying(data):
 
 if __name__ == '__main__':
     # Start Redis subscription
-    subscribe_to_redis()
+    subscribe_to_insights()
+    subscribe_to_price_monitor_results()
 
     # Start the Dash app
     app.run_server(debug=True, host='0.0.0.0', port=5000)
