@@ -5,6 +5,8 @@ import os
 import redis
 import psycopg2
 from psycopg2.extras import RealDictCursor
+import pika
+
 
 # Get environment variables of rabbitmq broker
 RABBITMQ_USER = os.environ.get('RABBITMQ_USER')
@@ -29,8 +31,16 @@ db_conn_params = {
     'port': DB_PORT
 }
 
+
+RABITI_MQ_URL =f'amqp://{RABBITMQ_USER}:{RABBITMQ_PASS}@{RABBITMQ_HOST}:{RABBITMQ_PORT}//'
+
+connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST))
+channel = connection.channel()
+queue_name = 'cupom'
+channel.queue_declare(queue=queue_name, durable=True)
+
 app = Celery('tasks', 
-             broker=f'amqp://{RABBITMQ_USER}:{RABBITMQ_PASS}@{RABBITMQ_HOST}:{RABBITMQ_PORT}//', broker_connection_retry_on_startup=True)
+             broker=RABITI_MQ_URL, broker_connection_retry_on_startup=True)
 
 # Bonus thresholds
 X = 100.00  # Minimum billing value in the last 10 minutes
@@ -133,8 +143,8 @@ def save_event(message):
     print(f"User ID: {user_id}")
     
     if check_criteria(user_id):
-        coupon = generate_coupon(user_id)
-        notify_ecommerce(user_id, coupon)
+        coupon = generate_coupon(user_id, message["store_id"])
+        notify_ecommerce(user_id, coupon, message["store_id"])
         return {"status": "coupon generated", "coupon": coupon}
     else:
         print("No coupon generated")
@@ -158,11 +168,21 @@ def check_criteria(user_id):
     
     return total_10_minutes > X and total_6_hours > Y
 
-def generate_coupon(user_id):
+def generate_coupon(user_id, store_id):
     # Logic to generate a unique coupon code
-    coupon = f"COUPON-{user_id}-{int(datetime.now().timestamp())}"
+    coupon = f"COUPON-{user_id}-{store_id}-{int(datetime.now().timestamp())}"
     return coupon
 
-def notify_ecommerce(user_id, coupon):
+def notify_ecommerce(user_id, coupon, store_id):
     # Simulate notification to e-commerce
-    print(f"Notifying e-commerce: User {user_id} received the coupon {coupon}")
+    msg = "Notifying e-commerce {store_id}: User {user_id} received the coupon {coupon}"
+    send_log(msg)
+
+def send_log(log_message):
+    channel.basic_publish(exchange='',
+                          routing_key=queue_name,
+                          body=json.dumps(log_message),
+                          properties=pika.BasicProperties(
+                              delivery_mode=2,  # make message persistent
+                          ))
+    print(f"\n\n\n!!!!!!!!!!!!!!!!!!!! Sent: {log_message} ON {channel} ON {queue_name}")  

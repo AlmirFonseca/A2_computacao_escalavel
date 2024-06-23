@@ -12,8 +12,6 @@ Install the Docker and its images:
 
 To run the docker:
 
-docker-compose up --build
-
 To view the streamlit app:
 
 - http://localhost:8501/

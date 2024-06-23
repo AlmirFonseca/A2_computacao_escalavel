@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify
 from bonus_system import save_event_message
-import json
 
 app = Flask(__name__)
 

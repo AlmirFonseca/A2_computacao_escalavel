@@ -4,3 +4,4 @@ celery
 redis
 psycopg2
 redis_collections
+pika==1.2.0
