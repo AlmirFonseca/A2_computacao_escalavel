@@ -1,7 +1,4 @@
 flask
-requests
-celery
+confluent_kafka
 redis
 psycopg2
-redis_collections
-pika==1.2.0
