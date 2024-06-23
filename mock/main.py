@@ -9,7 +9,7 @@ def simulate_store(store_id_unique, logs_folder):
     print(f"Starting simulation for Store {store_id_unique}...")
     
     params = simulation.SimulationParams(
-        cycle_duration=5,
+        cycle_duration=50,
         num_initial_users=100,
         num_initial_products=100,
         qtd_stock_initial=100,
@@ -57,7 +57,7 @@ def main(num_stores: int, local: int):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the simulation")
-    parser.add_argument("--num_stores", type=int, help="Number of stores to simulate", default=5)
+    parser.add_argument("--num_stores", type=int, help="Number of stores to simulate", default=1)
     parser.add_argument("--local", type=int, help="Run locally or in the cloud (1 for local, 0 for cloud)", default=1)
     args = parser.parse_args()
 

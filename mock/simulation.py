@@ -39,6 +39,7 @@ class Simulation:
         self.users = []
         self.new_users = []
         self.products = []
+        self.products_prices = [] # the index of products_prices is the samee as the index of products
         self.new_products = []
         self.stock = {}
         self.new_stock_decreases = {}
@@ -229,6 +230,10 @@ class Simulation:
     def __checkout(self, user, product_list):
         msg = f";{self.params.store_id};User;{user};{STIMUL_CLICK};{CHECKOUT} with {product_list}.\n"
         self.__add_message_to_user_flow_report(msg)
+        for i, product in enumerate(product_list):
+            msg_buy = f";{self.params.store_id};User;{user};{STIMUL_CLICK};{BUY}-{product}-{self.products_prices[i]}.\n"
+            self.__add_message_to_user_flow_report(msg_buy)
+
 
         
         def add_purchase_order():
@@ -265,6 +270,7 @@ class Simulation:
     def __generate_product(self):
         product = models.generate_product(self.params.store_id)
         self.products.append(product.id)
+        self.products_prices.append(product.price)
         self.new_products.append(product)        
 
     def __generate_stock_for_new_products(self):
