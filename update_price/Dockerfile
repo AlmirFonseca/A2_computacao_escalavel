@@ -6,6 +6,7 @@ WORKDIR /update_price
 
 # Copy the requirements file into the container
 COPY update_prices.py .
+COPY database_secrets.py .
 COPY requirements.txt .
 
 # Install the required packages

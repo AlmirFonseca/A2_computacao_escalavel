@@ -12,7 +12,7 @@ Install the Docker and its images:
 
 To run the docker:
 
-- docker-compose up --build
+docker-compose up --build
 
 To view the streamlit app:
 
@@ -29,4 +29,3 @@ Instructions to use AWS [Academy]
 - Go to modules
 - Init the Learning Lab of AWS Academy
 - When the AWS Status is green, you can click on it and see the services
-
