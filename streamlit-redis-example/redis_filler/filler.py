@@ -20,12 +20,7 @@ def fill_redis():
         for store_id in range(1, 11):
             data[store_id] = [(window_start, window_end, random.randint(1, 1000))]
 
-        # Send the data to Redis
-        for store_id, values in data.items():
-            for window_start, window_end, count in values:
-                key = f"{store_id}"
-                package = json.dumps({"window_start": window_start, "window_end": window_end, "count": count})
-                redis_client.hset("purchases_per_minute", key, package)
+        purchases_per_minute = {store_id: {"window_start": window_start, "window_end": window_end, "count": count} for store_id, values in data.items() for window_start, window_end, count in values}
 
         ###############################################################################################################
 
@@ -39,20 +34,24 @@ def fill_redis():
         for store_id in range(1, 11):
             data[store_id] = [(window_start, window_end, random.uniform(10000, 100000))]
 
-        # Send the data to Redis
-        for store_id, values in data.items():
-            for window_start, window_end, value in values:
-                key = f"{store_id}"
-                package = json.dumps({"window_start": window_start, "window_end": window_end, "value": value})
-                redis_client.hset("revenue_per_minute", key, package)
+        revenue_per_minute = {store_id: {"window_start": window_start, "window_end": window_end, "value": value} for store_id, values in data.items() for window_start, window_end, value in values}
 
         ###############################################################################################################
 
-        for i in range(10):
-            redis_client.zadd("most_viewed_products", {f"product_{random.randint(1, 1000)}": random.randint(1, 1000)})
-        redis_client.sadd("sold_out_products", f"product_{random.randint(1, 1000)}")
+        most_viewed_products = {f"product_{random.randint(1, 1000)}": random.randint(1, 1000) for _ in range(10)}
+        sold_out_products = f"product_{random.randint(1, 1000)}"
 
-        print("Data added to Redis at", time.ctime())
+        # Publish the data to Redis channels
+        message = json.dumps({
+            "purchases_per_minute": purchases_per_minute,
+            "revenue_per_minute": revenue_per_minute,
+            "most_viewed_products": most_viewed_products,
+            "sold_out_products": sold_out_products
+        })
+        
+        redis_client.publish("ecommerce_data", message)
+
+        print("Data published to Redis at", time.ctime())
         
         time.sleep(2)  # Parameterized sleep
 

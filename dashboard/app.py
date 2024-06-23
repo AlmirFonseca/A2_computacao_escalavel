@@ -136,12 +136,12 @@ def main():
     # Get the full store ID based on the shortenned store ID
     selected_store_full_id = next(store_id for store_id in store_ids if store_id.endswith(selected_shortened_store_id))
 
-    # st.write("selected_store_full_id", selected_store_full_id)
-    # st.write("store_ids", store_ids)
-    # st.write("shortened_store_ids", shortened_store_ids)
-    # st.write("purchases_per_minute", purchases_per_minute)
-    # st.write("purchases_per_minute(ALL)", purchases_per_minute.get("All"))
-    # st.write("purchases_per_minute(selected)", purchases_per_minute.get(selected_store_full_id))
+    st.write("selected_store_full_id", selected_store_full_id)
+    st.write("store_ids", store_ids)
+    st.write("shortened_store_ids", shortened_store_ids)
+    st.write("purchases_per_minute", purchases_per_minute)
+    st.write("purchases_per_minute(ALL)", purchases_per_minute.get("All"))
+    st.write("purchases_per_minute(selected)", purchases_per_minute.get(selected_store_full_id))
 
     # Filter the data based on the selected store
     purchases_per_minute = {selected_store_full_id: purchases_per_minute[selected_store_full_id]}

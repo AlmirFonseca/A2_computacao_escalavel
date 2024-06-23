@@ -210,17 +210,34 @@ def save_old_data(df, window_column, file_path):
     return df
 
 
-# Function to send the dataframe to the redis as a dictionary
-def send_to_redis_as_dict(redis_client, df, task_name, column_name = 'store_id'):
+# Function to send the dataframe to Redis as a dictionary and publish the data
+def send_to_redis_as_dict(redis_client, df, task_name, column_name='store_id', channel_name='ecommerce_data'):
+
+    message = {}
+    message['task_name'] = task_name
     for row in df.collect():
+
+        store_id = row[column_name]
+
         data = {}
         # Send 10 top products
         for i, detail in enumerate(row['details']):
             data[i] = {detail_key: detail_value for detail_key, detail_value in detail.asDict().items()}
             if i == 9:
                 break
+        
+        message[store_id] = data
 
-        redis_client.hset(task_name, str(row[column_name]), json.dumps(data))
+        # Set the data in the Redis hash
+        # redis_client.hset(task_name, str(store_id), json.dumps(data))
+        
+    # Publish the data to the Redis channel
+    print("Sending message to Redis: ", message)
+    redis_client.publish(channel_name, json.dumps(message))
+
+    # Save the data as json in a file
+    with open(f'./tasks/{task_name}.json', 'w') as f:
+        json.dump(message, f)
 
 
 # Function to process all the data

@@ -112,7 +112,8 @@ class Simulation:
 
     
     def run(self):
-        while True:
+        # while True:
+        for i in range(5):
             self.cycle += 1
 
             # CONTA VERDE

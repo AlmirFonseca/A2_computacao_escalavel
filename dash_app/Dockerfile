@@ -5,6 +5,6 @@ WORKDIR /app
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 
-COPY filler.py filler.py
+COPY . .
 
-CMD ["python", "filler.py"]
+CMD ["python", "app.py"]
