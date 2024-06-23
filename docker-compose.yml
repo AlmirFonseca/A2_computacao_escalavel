@@ -156,8 +156,6 @@ services:
       - DB_PASSWORD=mypassword
       - DB_HOST=postgres
       - DB_PORT=5432
-    volumes:
-      - ./price_monitor:/app
     command: python price_monitor.py
 
   # price_monitor_mock:

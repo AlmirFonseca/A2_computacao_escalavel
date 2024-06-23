@@ -1,52 +1,68 @@
 import os
-import psycopg2
-import json
 import redis
+import json
+import pyspark.sql.functions as F
 from datetime import datetime, timedelta
-import time
+from pyspark.sql import SparkSession
 
 # Configure Redis connection
 redis_client = redis.StrictRedis(host='redis', port=6379, db=0, decode_responses=True)
 
+# Spark session initialization
+spark = SparkSession.builder \
+    .appName("PriceMonitor") \
+    .config("spark.jars", "postgresql-42.7.3.jar") \
+    .getOrCreate()
+
 # Database connection settings
-conn_params = {
-    'dbname': os.environ.get('DB_NAME'),
-    'user': os.environ.get('DB_USER'),
-    'password': os.environ.get('DB_PASSWORD'),
-    'host': os.environ.get('DB_HOST'),
-    'port': os.environ.get('DB_PORT')
+jdbc_url = f"jdbc:postgresql://{os.environ.get('DB_HOST')}:{os.environ.get('DB_PORT')}/{os.environ.get('DB_NAME')}"
+connection_properties = {
+    "user": os.environ.get('DB_USER'),
+    "password": os.environ.get('DB_PASSWORD'),
+    "driver": "org.postgresql.Driver"
 }
 
+
 def get_price_deals(months, discount_percent):
-    conn = psycopg2.connect(**conn_params)
-    cursor = conn.cursor()
+    # Calculate the date range based on the user's input
     end_date = datetime.now()
-    start_date = end_date - timedelta(days=30 * months)
+    start_date = end_date - timedelta(days=months * 30) # assuming 30 days per month
     
-    cursor.execute("""
-        SELECT product_id, AVG(price) as average_price
-        FROM conta_verde.price_history
-        WHERE recorded_at BETWEEN %s AND %s
-        GROUP BY product_id
-    """, (start_date, end_date))
+    print(f" -> Getting historical prices from {start_date} to {end_date}")
+    # Load price history data from the database
+    price_history_df = spark.read.jdbc(
+        url=jdbc_url,
+        table="conta_verde.price_history",
+        properties=connection_properties
+    ) \
+        .filter((F.col("recorded_at") >= start_date) & (F.col("recorded_at") <= end_date))
+
+    price_history_df.show()
+
+    print(f" -> Calculating deals with a discount of {discount_percent}%") 
     
-    avg_prices = cursor.fetchall()
-    deals = []
-    for product_id, avg_price in avg_prices:
-        threshold_price = avg_price * (1 - discount_percent / 100)
-        cursor.execute("""
-            SELECT p.id, p.name, p.price
-            FROM conta_verde.products p
-            WHERE p.id = %s AND p.price < %s
-        """, (product_id, threshold_price))
-        
-        product = cursor.fetchone()
-        if product:
-            deals.append(product)
+    # Calculate the average prices of products within the specified period
+    avg_prices_df = price_history_df.groupBy("product_id").agg(F.avg("price").alias("average_price"))
     
-    cursor.close()
-    conn.close()
+    # Load current products data
+    products_df = spark.read.jdbc(
+        url=jdbc_url,
+        table="conta_verde.products",
+        properties=connection_properties
+    )
+    
+    # Determine the threshold prices and find deals
+    threshold_prices_df = avg_prices_df.withColumn("threshold_price", F.col("average_price") * (1 - discount_percent / 100))
+    
+    deals_df = products_df.join(threshold_prices_df, products_df.id == threshold_prices_df.product_id) \
+                          .filter(products_df.price < threshold_prices_df.threshold_price) \
+                          .select(products_df.id, products_df.name, products_df.price)
+    
+    # Convert the result to a list of tuples
+    deals = [(row.id, row.name, row.price) for row in deals_df.collect()]
+    
     return deals
+
 
 def handle_message(message):
     try:
@@ -54,6 +70,7 @@ def handle_message(message):
         data = message['data']
         if data:
             job_data = json.loads(data)
+            print(" <- Processing job:", job_data)
             deals = get_price_deals(job_data['time_window'], job_data['discount_percentage'])
             result = {
                 'status': 'success',
@@ -73,6 +90,6 @@ def subscribe_to_channel():
 
 if __name__ == '__main__':
     subscribe_to_channel()
-    print("Real Price Monitor Service Running...")
+    print("-- Price Monitor Service is running --")
     while True:
         pass
