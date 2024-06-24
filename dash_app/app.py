@@ -1,10 +1,12 @@
 import dash
-from dash import dcc, html
-from dash.dependencies import Output, Input
 import json
 import redis
 import threading
 import time
+
+from datetime import datetime
+from dash import dcc, html
+from dash.dependencies import Output, Input
 
 DEBUG = False
 
@@ -19,6 +21,7 @@ redis_client = redis.StrictRedis(host='redis', port=6379, db=0, decode_responses
 messages = {}
 latest_message = {}
 latest_result = None
+formatted_price_monitor_result = ""
 
 # Function to handle incoming messages
 def handle_message(message):
@@ -53,17 +56,63 @@ def subscribe_to_price_monitor_results():
     thread = pubsub.run_in_thread(sleep_time=0.001)
     return thread
 
+# Function to parse the price monitor result
+def parse_price_monitor_result(result):
+    if not result:
+        return "No result available."
+    
+    time_window = result.get('time_window', 'N/A')
+    discount_percentage = result.get('discount_percentage', 'N/A')
+    timestamp = result.get('timestamp', 'N/A')
+    formatted_timestamp = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%f").strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Initialize the formatted result
+    parsed_result = f"Showing offers in the period of {time_window} months with {discount_percentage}% of discount (at {formatted_timestamp}):\n"
+
+    # If there are no deals, add a message and return
+    if not result.get('deals', []):
+        return parsed_result + "No deals found.\n"
+
+    # Evaluate the discount percentage for each product
+    for deal in result.get('deals', []):
+        product_name = deal.get('name', 'N/A')
+        product_id = deal.get('id', 'N/A')
+        store_id = deal.get('store_id', 'N/A')
+        price = float(deal.get('price', 0))
+        average_price = float(deal.get('average_price', 0))
+        deal['evaluated_discount_percentage'] = ((average_price - price) / average_price) * 100
+
+    # Order by the discount percentage (descending order)
+    result['deals'] = sorted(result['deals'], key=lambda x: x['evaluated_discount_percentage'], reverse=True)
+
+    # Iterate over the ordered deals and format the result
+    for deal in result.get('deals', []):
+        product_name = deal.get('name', 'N/A')
+        product_id = deal.get('id', 'N/A')
+        store_id = deal.get('store_id', 'N/A')
+        price = float(deal.get('price', 0))
+        average_price = float(deal.get('average_price', 0))
+        evaluated_discount_percentage = deal.get('evaluated_discount_percentage', 0)
+        
+        parsed_result += f" - Product \"{product_name}\" (ID {product_id}): from ${average_price:.2f} to ${price:.2f} ({evaluated_discount_percentage:.2f}% of discount) in store {store_id}\n"
+    
+    return parsed_result
+
 # Handle incoming results
 def handle_price_monitor_result_message(message):
-    global latest_result
+    global latest_result, formatted_price_monitor_result
     data = message['data']
     if data:
         try:
             latest_result = json.loads(data)
             print("Received result:", latest_result)
 
+            # Parse and store the formatted result
+            formatted_price_monitor_result = parse_price_monitor_result(latest_result)
+
         except json.JSONDecodeError:
             print("Error decoding the result message.")
+            formatted_result = "Error decoding the result message."
 
 def load_store_ids():
     return sorted(messages.keys())
@@ -108,7 +157,7 @@ app.layout = html.Div([
     html.Div(id='container-button-basic'),
     dcc.Interval(
         id='update-interval',
-        interval=1000,  # Update every 1 second
+        interval=500,  # Update every 0.5 second
         n_intervals=0
     ),
     html.Div(id='result-output')
@@ -118,10 +167,8 @@ app.layout = html.Div([
     Output('result-output', 'children'),
     [Input('update-interval', 'n_intervals')]
 )
-def update_output_div(n):
-    if latest_result:
-        return f'Result: {json.dumps(latest_result)}'
-    return 'No new results yet.'
+def update_result_output(n):
+    return formatted_price_monitor_result
 
 # Callback to update the dropdown options dynamically
 @app.callback(
@@ -174,6 +221,7 @@ def update_output(n, selected_store):
      Input('discount-slider', 'value')]
 )
 def update_output(n_clicks, months, discount):
+    global formatted_price_monitor_result
     if n_clicks > 0 and discount > 0:
         message = {
             'task_name': 'price_monitor_job',
@@ -182,8 +230,9 @@ def update_output(n_clicks, months, discount):
         }
         redis_client.publish('price_monitor_channel', json.dumps(message))
         print(f"Sent PRICE_MONITOR message: {json.dumps(message, indent=2)}")
+        formatted_price_monitor_result = "Waiting for the result...\n"
 
-        return f'Offer request sent asking for products with a discount of {discount}% in the past {months} months (at {time.ctime()}).\n', 0
+        return f'Offer request sent asking for products with a discount of at least {discount}% in the past {months} months (at {time.ctime()}).\n', 0
     return 'Set discount greater than 0% to enable offer request and click the button to request offers.\n', n_clicks
 
 # Parsing functions
@@ -221,12 +270,6 @@ def parse_most_viewed_products(data):
 
     return result
 
-def parse_without_stock(data):
-    if not data:
-        return "No data available.\n"
-
-    return f"\n\nProducts Sold Without Stock: {data.get('0').get('products_sold_without_stock', 'N/A')} units\n"
-
 def parse_median_views_before_buying(data):
     if not data:
         return "No data available.\n"
@@ -255,6 +298,12 @@ def parse_median_views_before_buying(data):
             break
 
     return f"\n\nThe median of the views before buying is {median_view} (from {views[0]} to {views[-1]}, with a sum of {sum_view_count} views)\n"
+
+def parse_without_stock(data):
+    if not data:
+        return "No data available.\n"
+
+    return f"\n\nProducts Sold Without Stock: {data.get('0').get('products_sold_without_stock', '0')} units\n"
 
 if __name__ == '__main__':
     # Start Redis subscription
