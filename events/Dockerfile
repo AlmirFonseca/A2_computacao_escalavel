@@ -8,6 +8,11 @@ ENV PYTHONUNBUFFERED 1
 # Set the working directory in the container
 WORKDIR /events
 
+# INSTALL OPENJDK-11
+RUN apt-get update && \
+    apt-get install -y openjdk-11-jre && \
+    apt-get clean;
+
 # Install any needed packages specified in requirements.txt
 COPY requirements.txt .
 

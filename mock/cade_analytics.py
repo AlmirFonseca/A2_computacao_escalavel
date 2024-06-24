@@ -14,9 +14,9 @@ class CadeAnalytics:
         try:
             # check if is it a buy messagee
             # msg_buy = f";{self.params.store_id};User;{user};{STIMUL_CLICK};{BUY}-{product}-{self.products_prices[i]}.\n"
-            if message.split(";")[5].split("-")[0] == "BUY":
+            # if message.split(";")[5].split("-")[0] == "BUY":
                 # print("BUY MESSAGE", message)
-                print(f"Sending log  to URL {message}!!!!!!!!!!!!!!!!!!!!!!!!!\n\n\n\n")
+                # print(f"Sending log  to URL {message}!!!!!!!!!!!!!!!!!!!!!!!!!\n\n\n\n")
 
             # requests.post(self.SERVER_URL, data=message.encode('utf-8'), timeout=1)
             # requests.post(f"{self.SERVER_URL}", data=message.encode('utf-8'), timeout=1)

@@ -41,7 +41,7 @@ class ContaVerde:
             conn.commit()
             cur.close()
 
-            print("Purchase orders added successfully!")
+            # print("Purchase orders added successfully!")
         except Exception as e:
             print("Error:", e)
 
@@ -69,7 +69,7 @@ class ContaVerde:
             conn.commit()
             cur.close()
 
-            print("Stock added successfully!")
+            # print("Stock added successfully!")
         except Exception as e:
             print
 
@@ -96,7 +96,7 @@ class ContaVerde:
             conn.commit()
             cur.close()
 
-            print("Stock updated successfully!")
+            # print("Stock updated successfully!")
         except Exception as e:
             print("Error:", e)
 
@@ -123,7 +123,7 @@ class ContaVerde:
             conn.commit()
             cur.close()
 
-            print("Users added successfully!")
+            # print("Users added successfully!")
         except Exception as e:
             print("Error:", e)
 
@@ -150,6 +150,6 @@ class ContaVerde:
             conn.commit()
             cur.close()
 
-            print("Products added successfully!")
+            # print("Products added successfully!")
         except Exception as e:
             print("Error:", e)

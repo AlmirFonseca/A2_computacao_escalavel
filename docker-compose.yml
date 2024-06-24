@@ -60,33 +60,37 @@ services:
       - create_tables
       - postgres
       - webhook
+      - kafka
     environment:
-      WEBHOOK_HOST: webhook
-      WEBHOOK_PORT: 5000
+      - WEBHOOK_HOST=webhook
+      - WEBHOOK_PORT=5000
+      - KAFKA_BROKER=kafka:9093
+      - INPUT_TOPIC=users_bonus
     volumes:
       - ./mock:/app
     command: python main.py
 
   
-  # data-processor-app:
-  #   image: data_processor:latest
-  #   build: ./server
-  #   restart: on-failure
-  #   depends_on:
-  #     - create_tables
-  #     - postgres
-  #   environment:
-  #     - DB_NAME=mydatabase
-  #     - DB_USER=myuser
-  #     - DB_PASSWORD=mypassword
-  #     - DB_HOST=postgres
-  #     - DB_PORT=5432
-  #     - REDIS_HOST=redis
-  #     - REDIS_PORT=6379
-  #   volumes:
-  #     - ./mock/mock_files:/processor/mock_files
-  #     - ./tasks:/processor/tasks
-  #   command: python data_processor.py
+  data-processor-app:
+    image: data_processor:latest
+    build: ./server
+    restart: on-failure
+    depends_on:
+      - create_tables
+      - postgres
+    environment:
+      - DB_NAME=mydatabase
+      - DB_USER=myuser
+      - DB_PASSWORD=mypassword
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ./mock/mock_files:/processor/mock_files
+      - ./tasks:/processor/tasks
+    command: python data_processor.py
+
 
   dash_app:
     build: ./dash_app
@@ -101,26 +105,23 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
 
-  # bonus-system-worker:
-  #   build: ./events
-  #   depends_on:
-  #     - redis
-  #     - rabbitmq
-  #   environment:
-  #     - RABBITMQ_USER=guest
-  #     - RABBITMQ_PASS=guest
-  #     - RABBITMQ_HOST=rabbitmq
-  #     - RABBITMQ_PORT=5672
-  #     - REDIS_HOST=redis
-  #     - REDIS_PORT=6379
-  #     - DB_NAME=mydatabase
-  #     - DB_USER=myuser
-  #     - DB_PASSWORD=mypassword
-  #     - DB_HOST=postgres
-  #     - DB_PORT=5432
-  #   volumes:
-  #     - ./events:/events
-  #   command: celery -A bonus_system worker --loglevel=INFO --concurrency=10
+  bonus-system:
+    build: ./bonus
+    depends_on:
+      - redis
+      - postgres
+      - kafka
+    environment:
+      - KAFKA_BROKER=kafka:9093
+      - OUTPUT_TOPIC=users_bonus
+      - DB_NAME=mydatabase
+      - DB_USER=myuser
+      - DB_PASSWORD=mypassword
+      - DB_HOST=postgres
+      - DB_PORT=5432
+    volumes:
+      - ./bonus/jars:/bonus/jars # This is to avoid downloading the jars every time the container is created
+    command: python bonus_system.py
   
   webhook:
     image: webhook:latest
@@ -149,21 +150,7 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     command: python -u queue_consumer.py
-
-  # cupom:
-  #   build: ./cupom
-  #   depends_on:
-  #     - rabbitmq
-  #   # restart: on-failure
-  #   environment:
-  #     - RABBITMQ_USER=guest
-  #     - RABBITMQ_PASS=guest
-  #     - RABBITMQ_HOST=rabbitmq
-  #     - RABBITMQ_PORT=5672
-  #   volumes:
-  #     - ./cupom:/cupom
-  #   command: python cupao_receiver.py
-
+  
   price-monitor:
     build: ./price_monitor
     container_name: price_monitor
@@ -177,14 +164,6 @@ services:
       - DB_HOST=postgres
       - DB_PORT=5432
     command: python price_monitor.py
-
-  # price_monitor_mock:
-  #   build: ./price_monitor_mock
-  #   container_name: price_monitor_mock
-  #   depends_on:
-  #     - redis
-  #   volumes:
-  #     - ./price_monitor_mock:/app
 
   price-updater:
     build: ./update_price
