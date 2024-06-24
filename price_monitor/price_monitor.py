@@ -29,13 +29,13 @@ def get_price_deals(months, discount_percent):
     start_date = end_date - timedelta(days=months * 30) # assuming 30 days per month
     
     print(f" -> Getting historical prices from {start_date} to {end_date}")
+    
     # Load price history data from the database
     price_history_df = spark.read.jdbc(
         url=jdbc_url,
         table="conta_verde.price_history",
         properties=connection_properties
-    ) \
-        .filter((F.col("recorded_at") >= start_date) & (F.col("recorded_at") <= end_date))
+    ).filter((F.col("recorded_at") >= start_date) & (F.col("recorded_at") <= end_date))
 
     price_history_df.show()
 
@@ -56,10 +56,15 @@ def get_price_deals(months, discount_percent):
     
     deals_df = products_df.join(threshold_prices_df, products_df.id == threshold_prices_df.product_id) \
                           .filter(products_df.price < threshold_prices_df.threshold_price) \
-                          .select(products_df.id, products_df.name, products_df.price)
+                          .withColumn("price", F.col("price").cast("string")) \
+                          .withColumn("average_price", F.col("average_price").cast("string")) \
+                          .select(products_df.id, products_df.name, products_df.store_id, products_df.price, threshold_prices_df.average_price)
+    
+    
+    deals_df.show()
     
     # Convert the result to a list of tuples
-    deals = [(row.id, row.name, row.price) for row in deals_df.collect()]
+    deals = deals_df.collect()
     
     return deals
 
@@ -75,7 +80,9 @@ def handle_message(message):
             result = {
                 'status': 'success',
                 'task_name': "price_monitor_job_results",
-                'deals': [{'id': deal[0], 'name': deal[1], 'price': deal[2]} for deal in deals],
+                'deals': [{'id': deal.id, 'name': deal.name, 'store_id': deal.store_id, 'price': deal.price, 'average_price': deal.average_price} for deal in deals],
+                'time_window': job_data['time_window'],
+                'discount_percentage': job_data['discount_percentage'],
                 'timestamp': datetime.now().isoformat()
             }
             redis_client.publish('price_monitor_job_results', json.dumps(result))

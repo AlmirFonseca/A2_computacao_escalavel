@@ -169,6 +169,7 @@ services:
     build: ./update_price
     depends_on:
       - postgres
+      - insert_data
     environment:
       - POSTGREE_CREDENTIALS__DBNAME=mydatabase
       - POSTGREE_CREDENTIALS__USER=myuser
