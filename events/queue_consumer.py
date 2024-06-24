@@ -1,17 +1,16 @@
-import redis
-import time
 import os
+import time
+from confluent_kafka import Consumer, Producer
 import psycopg2
-# import bonus_system to receive events list
+import redis
+import threading
 
-from bonus_system import receive_batch_events
-
-
-REDIS_HOST = os.environ.get('REDIS_HOST')
-REDIS_PORT = os.environ.get('REDIS_PORT')
+# Configuração do Redis
+REDIS_HOST = os.environ.get('REDIS_HOST', 'localhost')
+REDIS_PORT = os.environ.get('REDIS_PORT', 6379)
 redis_client = redis.StrictRedis(host=REDIS_HOST, port=REDIS_PORT, db=0)
 
-# postgres
+# Configuração do PostgreSQL
 DB_NAME = os.environ.get('DB_NAME')
 DB_USER = os.environ.get('DB_USER')
 DB_PASSWORD = os.environ.get('DB_PASSWORD')
@@ -26,85 +25,108 @@ db_conn_params = {
     'port': DB_PORT
 }
 
-# def process_data_list(data_list):
-#     processed_data = []
-#     for item in data_list:
-#         # Access each element using keys or tuple indices
-#         id_number, guid, user, timestamp, action, details = item.split(';')
+# Configuração do Kafka
+BROKER_URL = os.environ.get('KAFKA_BROKER', 'localhost:9092')
+INPUT_TOPIC = os.environ.get('INPUT_TOPIC')
+OUTPUT_TOPIC = os.environ.get('OUTPUT_TOPIC')
+
+def create_producer(broker_url):
+    try:
+        producer = Producer({'bootstrap.servers': broker_url})
+        return producer
+    except Exception as e:
+        print(f'An error occurred creating producer: {e}')
+        return None
+
+producer = create_producer(BROKER_URL)
+
+# Função para consumir mensagens de um tópico Kafka
+def consume_messages(broker_url, topic_name):
+    print(f'Consuming messages from topic: {topic_name}')
+    try:
+        consumer = Consumer({
+            'bootstrap.servers': broker_url,
+            'group.id': 'event_subscriber',
+            'auto.offset.reset': 'earliest'
+        })
         
-#         # Example processing logic:
-#         processed_item = {
-#             'id_number': id_number,
-#             'guid': guid,
-#             'user': user,
-#             'timestamp': timestamp,
-#             'action': action,
-#             'details': details.strip()  # Remove trailing newline characters
-#         }
+        consumer.subscribe([topic_name])
+
+        while True:
+            message = consumer.poll(timeout=1.0)
+            if message is None:
+                continue
+            if message.error():
+                print(f'Error consuming message: {message.error()}')
+            else:
+                msg_value = message.value().decode()
+                print(f'Message received: {msg_value}')
+                cache_message(msg_value)
+    except Exception as e:
+        print(f'An error occurred consuming messages: {e}')
+    finally:
+        consumer.close()
+
+def cache_message(message):
+    try:
+        redis_client.rpush('events_cache', message)
+        print("Message cached in Redis")
+    except Exception as e:
+        print(f'Error caching message in Redis: {e}')
+
+def dequeue_all_itens(conn, producer, output_topic):
+    items = redis_client.lrange('events_cache', 0, -1)
+    redis_client.delete('events_cache')
+
+    if items:
+        messages = [item.decode('utf-8') for item in items]
+
+        try:
+            cursor = conn.cursor()
+            cursor.executemany("INSERT INTO events (message) VALUES (%s)", [(msg,) for msg in messages])
+            conn.commit()
+            cursor.close()
+            print(f"Inserted {len(messages)} items into database")
+        except Exception as e:
+            print(f'Error inserting into database: {e}')
+            return
         
-#         processed_data.append(processed_item)
-    
-#     return processed_data
-
-# def send_to_bonus_system(list_events):
-#     print("=====================================")
-#     # send the list of events to the redis queue
-#     for event in list_events:
-#         redis_client.rpush('events_bonus', event)
-#         print(f"Event sent to bonus system: {event}")
-
-#     receive_batch_events.delay('events_bonus')
-
-# Function to dequeue an item
-def dequeue_all_itens(conn):
-    # itens = []
-    # while True:
-    #     item = redis_client.lpop('events')
-    #     if item is None:
-    #         break
-    #     else:
-    #         print(f"Dequeued item: {item.decode('utf-8')}")
-    #     itens.append(item.decode('utf-8'))
-
-    itens = redis_client.lrange('events', 0, -1)
-    redis_client.delete('events')
-        
-    if itens is not None:
-
-        # send_to_bonus_system(itens)
-
-        # execute many
-        cursor.executemany("INSERT INTO events (message) VALUES (%s)", [(item,) for item in itens])
-        conn.commit()
-
-        print(f"Dequeued {len(itens)} itens")
+        try:
+            producer.produce(output_topic, value=str(messages))
+            producer.flush()
+            print(f"Sent batch of {len(messages)} messages to Kafka topic '{output_topic}'")
+        except Exception as e:
+            print(f'Error sending messages to Kafka: {e}')
     else:
-        print("No itens to dequeue")
-    
+        print("No items to dequeue")
 
-if __name__ == "__main__":
-    # create tables events
+if __name__ == '__main__':
+    # Criação da tabela 'events' no PostgreSQL
     try:
         conn = psycopg2.connect(**db_conn_params)
         cursor = conn.cursor()
-        # drop table events if exists
         cursor.execute("DROP TABLE IF EXISTS events")
         cursor.execute("CREATE TABLE IF NOT EXISTS events (id SERIAL PRIMARY KEY, message TEXT)")
         conn.commit()
+        cursor.close()
         conn.close()
+        print("Database setup complete")
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error setting up database: {e}")
         exit(1)
+
+    # Iniciar consumo de mensagens
+    kafka_consumer_thread = threading.Thread(target=consume_messages, args=(BROKER_URL, INPUT_TOPIC))
+    kafka_consumer_thread.start()
+
+    # Processamento em batch do Redis para PostgreSQL e Kafka
     while True:
         try:
             conn = psycopg2.connect(**db_conn_params)
-            cursor = conn.cursor()
             print("Connected to the database")
+            dequeue_all_itens(conn, producer, OUTPUT_TOPIC)
+            conn.close()
         except Exception as e:
-            print(f"Error: {e}")
-            exit(1)
-
-
-        dequeue_all_itens(conn)
-        conn.close()
-        time.sleep(1)  # Sleep for a second before checking the queue again
+            print(f'Error: {e}')
+        
+        time.sleep(5)  # Sleep for 5 seconds before checking the queue again
