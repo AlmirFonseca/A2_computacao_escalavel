@@ -35,14 +35,14 @@ def get_price_deals(months, discount_percent):
         url=jdbc_url,
         table="conta_verde.price_history",
         properties=connection_properties
-    ).filter((F.col("recorded_at") >= start_date) & (F.col("recorded_at") <= end_date))
+    ).filter(F.col("recorded_at") >= start_date)
 
     price_history_df.show()
 
     print(f" -> Calculating deals with a discount of {discount_percent}%") 
     
     # Calculate the average prices of products within the specified period
-    avg_prices_df = price_history_df.groupBy("product_id").agg(F.avg("price").alias("average_price"))
+    avg_prices_df = price_history_df.groupBy("product_id", "store_id").agg(F.avg("price").alias("average_price"))
     
     # Load current products data
     products_df = spark.read.jdbc(
@@ -52,14 +52,19 @@ def get_price_deals(months, discount_percent):
     )
     
     # Determine the threshold prices and find deals
-    threshold_prices_df = avg_prices_df.withColumn("threshold_price", F.col("average_price") * (1 - discount_percent / 100))
-    
-    deals_df = products_df.join(threshold_prices_df, products_df.id == threshold_prices_df.product_id) \
+    threshold_prices_df = avg_prices_df.withColumnRenamed("average_price", "avg_price") \
+                                       .withColumn("threshold_price", F.col("avg_price") * (1 - discount_percent / 100)) \
+                                       .withColumnRenamed("product_id", "id")
+
+    deals_df = products_df.join(threshold_prices_df, ["id", "store_id"], "inner") \
                           .filter(products_df.price < threshold_prices_df.threshold_price) \
+                          .select(products_df.id.alias("product_id"), 
+                                  products_df.name, 
+                                  products_df.store_id, 
+                                  products_df.price, 
+                                  threshold_prices_df.avg_price.alias("average_price")) \
                           .withColumn("price", F.col("price").cast("string")) \
-                          .withColumn("average_price", F.col("average_price").cast("string")) \
-                          .select(products_df.id, products_df.name, products_df.store_id, products_df.price, threshold_prices_df.average_price)
-    
+                          .withColumn("average_price", F.col("average_price").cast("string"))
     
     deals_df.show()
     
@@ -80,7 +85,11 @@ def handle_message(message):
             result = {
                 'status': 'success',
                 'task_name': "price_monitor_job_results",
-                'deals': [{'id': deal.id, 'name': deal.name, 'store_id': deal.store_id, 'price': deal.price, 'average_price': deal.average_price} for deal in deals],
+                'deals': [{'id': row.product_id, 
+                           'name': row.name, 
+                           'store_id': row.store_id, 
+                           'price': row.price, 
+                           'average_price': row.average_price} for row in deals],
                 'time_window': job_data['time_window'],
                 'discount_percentage': job_data['discount_percentage'],
                 'timestamp': datetime.now().isoformat()
