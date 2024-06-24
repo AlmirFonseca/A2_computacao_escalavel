@@ -1,4 +1,5 @@
 from graph_user_flow import *
+from confluent_kafka import Consumer
 import simulation
 import argparse
 import multiprocessing
@@ -55,7 +56,39 @@ def main(num_stores: int, local: int):
     else:
         print("Cloud execution not implemented yet.")
 
+
+# Function to consume messages from a Kafka topic
+def consume_messages(broker_url, topic_name):
+    print(f'Consuming messages from topic: {topic_name}')
+    try:
+        try:
+            subscriber = Consumer({'bootstrap.servers': broker_url, 'group.id': 'event_subscriber'})
+        except Exception as e:
+            print(f'An error occurred connecting to Kafka: {e}')
+            return
+        
+        subscriber.subscribe([topic_name])
+
+        while True:
+            message = subscriber.poll(timeout=1.0)
+            if message is None:
+                continue
+            if message.error():
+                print(f'Error consuming message: {message.error()}')
+            else:
+                message = message.value().decode()
+                print(f'\n========= USER {message["user_id"]} OF STORE {message["store_id"]} GOT A COUPON =========\n')
+    except Exception as e:
+        print(f'An error occurred consuming messages: {e}')
+
+
 if __name__ == "__main__":
+    KAFKA_BROKER = os.environ.get('KAFKA_BROKER', 'localhost:9092')
+    INPUT_TOPIC = os.environ.get('INPUT_TOPIC')
+
+    # Add a consumer to the Kafka topic
+    multiprocessing.Process(target=consume_messages, args=(KAFKA_BROKER, INPUT_TOPIC)).start()
+
     parser = argparse.ArgumentParser(description="Run the simulation")
     parser.add_argument("--num_stores", type=int, help="Number of stores to simulate", default=5)
     parser.add_argument("--local", type=int, help="Run locally or in the cloud (1 for local, 0 for cloud)", default=1)
