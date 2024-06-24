@@ -5,12 +5,14 @@
 Install the Docker and its images:
 
 - Docker: https://docs.docker.com/desktop/install/windows-install/
-- Image Python (Oficial) Docker: https://hub.docker.com/_/pythons
-  - The official is based on debian
-- Kafka (Broker): https://hub.docker.com/r/apache/kafka
-- PostgreeSQL: https://hub.docker.com/_/postgres
+
+* Image Python (Oficial) Docker: [https://hub.docker.com/_/pythons](https://hub.docker.com/_/pythons)
+  * The official is based on debian
 
 To run the docker:
+
+* Start the docker engine (installed application)
+* docker-compose up --build -d
 
 To view the streamlit app:
 
