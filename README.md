@@ -1,4 +1,5 @@
 # A2_computacao_escalavel, made by
+
 - Almir Fonseca
 - Gabriel Pereira
 - Gustavo Rocha
@@ -11,11 +12,18 @@
 Install the Docker and its images and run the docker-compose:
 
 1. Start the docker engine (installed application)
-2. ```{bash} docker-compose up --build -d```
+2. ``{bash} docker-compose up --build -d``
 
 To view the Dashboard web app:
 
 - http://localhost:5000/
+
+**Troubleshooting**:
+
+- If something do not works as expect, the first step is to:
+
+  - check the Docker Images that are running (which might be due to dependences of containers that are still waking):
+  - It can be done in the GUI interface of Docker.
 
 To check the database state:
 
