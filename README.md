@@ -1,22 +1,21 @@
-# A2_computacao_escalavel
+# A2_computacao_escalavel, made by
+- Almir Fonseca
+- Gabriel Pereira
+- Gustavo Rocha
+- Juliana Carvalho
 
-# Windows:
-
-Install the Docker and its images:
+# How to run on Windows:
 
 - Docker: https://docs.docker.com/desktop/install/windows-install/
 
-* Image Python (Oficial) Docker: [https://hub.docker.com/_/pythons](https://hub.docker.com/_/pythons)
-  * The official is based on debian
+Install the Docker and its images and run the docker-compose:
 
-To run the docker:
+1. Start the docker engine (installed application)
+2. ```{bash} docker-compose up --build -d```
 
-* Start the docker engine (installed application)
-* docker-compose up --build -d
+To view the Dashboard web app:
 
-To view the streamlit app:
-
-- http://localhost:8501/
+- http://localhost:5000/
 
 To check the database state:
 
