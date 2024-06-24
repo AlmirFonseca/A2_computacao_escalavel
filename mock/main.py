@@ -3,6 +3,7 @@ from confluent_kafka import Consumer
 import simulation
 import argparse
 import multiprocessing
+import json
 import os
 import uuid
 
@@ -76,8 +77,8 @@ def consume_messages(broker_url, topic_name):
             if message.error():
                 print(f'Error consuming message: {message.error()}')
             else:
-                message = message.value().decode()
-                print(f'\n========= USER {message["user_id"]} OF STORE {message["store_id"]} GOT A COUPON =========\n')
+                message = json.loads(message.value())
+                print(f'========= USER {message["user_id"]} OF STORE {message["store_id"]} GOT A COUPON =========')
     except Exception as e:
         print(f'An error occurred consuming messages: {e}')
 
