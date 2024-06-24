@@ -9,7 +9,7 @@ import time
 DEBUG = False
 
 # Initialize the Dash app
-app = dash.Dash(__name__)
+app = dash.Dash(__name__, external_stylesheets=['/assets/styles.css'])
 server = app.server
 
 # Redis connection

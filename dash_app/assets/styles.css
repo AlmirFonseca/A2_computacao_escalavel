@@ -1,0 +1,85 @@
+/* General layout */
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f9f9f9;
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    width: 90%;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Header styles */
+h1, h2, h4 {
+    color: #333;
+    text-align: center;
+}
+
+/* Dropdown */
+.dash-dropdown {
+    margin: 10px 0;
+    width: 100%;
+    padding: 10px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+/* Sliders */
+.dccSlider {
+    margin: 20px 0;
+}
+
+.dccSlider .rc-slider-rail {
+    height: 6px;
+    background-color: #ccc;
+}
+
+.dccSlider .rc-slider-track {
+    background-color: #007bff;
+}
+
+.dccSlider .rc-slider-handle {
+    border: solid 2px #007bff;
+    height: 22px;
+    width: 22px;
+    margin-top: -8px;
+}
+
+/* Button */
+.dash-button {
+    display: block;
+    width: 100%;
+    margin: 20px 0;
+    padding: 15px;
+    font-size: 16px;
+    color: #fff;
+    background-color: #007bff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    text-align: center;
+}
+
+.dash-button:hover {
+    background-color: #0056b3;
+}
+
+/* Output sections */
+#output, #result-output, #container-button-basic {
+    padding: 10px;
+    margin: 10px 0;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+/* Interval components */
+.dccInterval {
+    display: none;
+}
